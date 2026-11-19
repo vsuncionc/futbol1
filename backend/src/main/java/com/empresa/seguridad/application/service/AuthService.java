@@ -11,12 +11,10 @@ import com.empresa.seguridad.domain.repository.RoleRepository;
 import com.empresa.seguridad.domain.repository.SystemConfigurationRepository;
 import com.empresa.seguridad.domain.repository.UserRepository;
 import com.empresa.seguridad.infrastructure.security.JwtService;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -152,6 +150,46 @@ public class AuthService {
     }
 
     @Transactional
+    public void registerTecnico(RegisterTecnicoRequest request, String ip, String userAgent) {
+        if (request.confirmPassword() != null && !request.password().equals(request.confirmPassword())) {
+            throw new IllegalArgumentException("Las contraseñas no coinciden");
+        }
+
+        String normalizedEmail = request.email().toLowerCase().trim();
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new IllegalArgumentException("El correo electrónico ya se encuentra registrado.");
+        }
+
+        Role tecnicoRole = roleRepository.findByCode("ROLE_TECNICO")
+                .orElseGet(() -> {
+                    Role r = Role.builder()
+                            .code("ROLE_TECNICO")
+                            .name("Técnico")
+                            .description("Técnico organizador de encuentros")
+                            .isSystemRole(true)
+                            .build();
+                    return roleRepository.save(r);
+                });
+
+        String fullName = (request.nombres().trim() + " " + request.apellidos().trim()).trim();
+
+        User newTecnico = User.builder()
+                .fullName(fullName)
+                .email(normalizedEmail)
+                .telefono(request.telefono() != null ? request.telefono().trim() : null)
+                .passwordHash(passwordEncoder.encode(request.password()))
+                .enabled(true)
+                .accountNonLocked(true)
+                .estadoAprobacion(com.empresa.seguridad.domain.model.EstadoAprobacion.PENDIENTE)
+                .failedLoginAttempts(0)
+                .roles(Collections.singleton(tecnicoRole))
+                .build();
+
+        userRepository.save(newTecnico);
+        auditService.recordEvent(newTecnico, "TECNICO_REGISTERED", ip, userAgent, "Registro de usuario técnico en estado PENDIENTE.");
+    }
+
+    @Transactional
     public LoginResponse refreshToken(String rawRefreshToken, HttpServletResponse response, String ip, String userAgent) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
             throw new IllegalArgumentException("Token de refresco ausente");
@@ -205,13 +243,6 @@ public class AuthService {
 
     @Transactional
     public void logout(String rawRefreshToken, HttpServletResponse response) {
-        if (rawRefreshToken != null && !rawRefreshToken.isBlank()) {
-            try {
-                String hash = refreshTokenService.hashToken(rawRefreshToken);
-                // Revocar el token específico
-                // Si falla o no existe, simplemente se limpia la cookie
-            } catch (Exception ignored) {}
-        }
         deleteRefreshTokenCookie(response);
     }
 
@@ -258,6 +289,8 @@ public class AuthService {
                 user.getId(),
                 user.getEmail(),
                 user.getFullName(),
+                user.getTelefono(),
+                user.getEstadoAprobacion(),
                 roles,
                 permissions
         );

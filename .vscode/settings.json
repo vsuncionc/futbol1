@@ -1,3 +1,13 @@
 {
-    "java.compile.nullAnalysis.mode": "automatic"
+    "java.compile.nullAnalysis.mode": "disabled",
+    "boot-java.ls.commons.lifecycle.enable": false,
+    "boot-java.validation.java.version-validation": "OFF",
+    "spring-boot.ls.problem.version-validation.SUPPORTED_OSS_VERSION": "IGNORE",
+    "spring-boot.ls.problem.version-validation.UNSUPPORTED_OSS_VERSION": "IGNORE",
+    "spring-boot.ls.problem.version-validation.UNSUPPORTED_COMMERCIAL_VERSION": "IGNORE",
+    "spring-boot.ls.problem.version-validation.UPDATE_LATEST_MAJOR_VERSION": "IGNORE",
+    "spring-boot.ls.problem.version-validation.UPDATE_LATEST_MINOR_VERSION": "IGNORE",
+    "spring-boot.ls.problem.version-validation.UPDATE_LATEST_PATCH_VERSION": "IGNORE",
+    "spring-boot.ls.problem.boot2.JAVA_REPOSITORY": "IGNORE",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

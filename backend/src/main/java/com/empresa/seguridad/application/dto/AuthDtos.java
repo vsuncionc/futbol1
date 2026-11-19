@@ -74,10 +74,37 @@ public class AuthDtos {
             String newPassword
     ) {}
 
+    public record RegisterTecnicoRequest(
+            @NotBlank(message = "Los nombres son requeridos")
+            String nombres,
+
+            @NotBlank(message = "Los apellidos son requeridos")
+            String apellidos,
+
+            @NotBlank(message = "El correo electrónico es requerido")
+            @Email(message = "El formato de correo es inválido")
+            String email,
+
+            @NotBlank(message = "El teléfono es requerido")
+            String telefono,
+
+            @NotBlank(message = "La contraseña es requerida")
+            @Size(min = 8, max = 64, message = "La contraseña debe tener entre 8 y 64 caracteres")
+            @Pattern(
+                    regexp = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).*$",
+                    message = "La contraseña debe contener al menos una letra mayúscula, una minúscula y un número"
+            )
+            String password,
+
+            String confirmPassword
+    ) {}
+
     public record UserSummaryDto(
             UUID id,
             String email,
             String fullName,
+            String telefono,
+            com.empresa.seguridad.domain.model.EstadoAprobacion estadoAprobacion,
             Set<String> roles,
             Set<String> permissions
     ) {}

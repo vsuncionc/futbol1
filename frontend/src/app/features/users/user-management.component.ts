@@ -14,6 +14,14 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import Swal from 'sweetalert2';
 import { UserDetail } from '../../core/models/auth.models';
 
+export interface RoleItem {
+  id?: string;
+  code: string;
+  name: string;
+  description?: string;
+  isSystemRole?: boolean;
+}
+
 interface UserRow {
   id: string;
   initials: string;
@@ -21,6 +29,7 @@ interface UserRow {
   name: string;
   email: string;
   role: string;
+  roleCode: string;
   roleClass: string;
   status: string;
   statusClass: string;
@@ -138,10 +147,11 @@ interface UserRow {
                 </label>
                 <mat-form-field appearance="outline" style="width: 100%;">
                   <mat-select formControlName="role">
-                    <mat-option value="Analista">Analista</mat-option>
-                    <mat-option value="Administrador">Administrador</mat-option>
-                    <mat-option value="Editor">Editor</mat-option>
-                    <mat-option value="Visualizador">Visualizador</mat-option>
+                    @for (r of rolesDisponibles(); track r.code) {
+                      <mat-option [value]="r.code">
+                        {{ r.name }} ({{ r.code }})
+                      </mat-option>
+                    }
                   </mat-select>
                 </mat-form-field>
               </div>
@@ -235,10 +245,11 @@ interface UserRow {
                 </label>
                 <mat-form-field appearance="outline" style="width: 100%;">
                   <mat-select formControlName="role">
-                    <mat-option value="Administrador">Administrador</mat-option>
-                    <mat-option value="Editor">Editor</mat-option>
-                    <mat-option value="Visualizador">Visualizador</mat-option>
-                    <mat-option value="Analista">Analista</mat-option>
+                    @for (r of rolesDisponibles(); track r.code) {
+                      <mat-option [value]="r.code">
+                        {{ r.name }} ({{ r.code }})
+                      </mat-option>
+                    }
                   </mat-select>
                 </mat-form-field>
               </div>
@@ -505,11 +516,23 @@ export class UserManagementComponent implements OnInit {
   readonly hideConfirmPassword = signal(true);
   readonly generatedPasswordHint = signal<string | null>(null);
 
+  // Lista dinámica de roles disponibles desde el backend
+  readonly rolesDisponibles = signal<RoleItem[]>([
+    { code: 'ROLE_SUPER_ADMIN', name: 'Super Administrador' },
+    { code: 'ROLE_ADMIN', name: 'Administrador' },
+    { code: 'ROLE_TECNICO', name: 'Técnico' },
+    { code: 'ROLE_ANALISTA', name: 'Analista' },
+    { code: 'ROLE_EDITOR', name: 'Editor' },
+    { code: 'ROLE_VISUALIZADOR', name: 'Visualizador' },
+    { code: 'ROLE_USER', name: 'Usuario' },
+    { code: 'ROLE_STANDARD', name: 'Usuario Estándar' }
+  ]);
+
   // Formulario Crear Usuario (Diseño 3)
   createForm: FormGroup = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
     fullName: ['', [Validators.required, Validators.minLength(3)]],
-    role: ['Analista', [Validators.required]],
+    role: ['ROLE_ANALISTA', [Validators.required]],
     enabled: [true]
   });
 
@@ -517,7 +540,7 @@ export class UserManagementComponent implements OnInit {
   editForm: FormGroup = this.fb.group({
     fullName: ['', [Validators.required, Validators.minLength(3)]],
     email: [''],
-    role: ['Administrador', [Validators.required]],
+    role: ['ROLE_ADMIN', [Validators.required]],
     enabled: [true]
   });
 
@@ -533,7 +556,50 @@ export class UserManagementComponent implements OnInit {
   filteredUsers: UserRow[] = [];
 
   ngOnInit(): void {
+    this.loadRoles();
     this.loadFromBackend();
+  }
+
+  loadRoles(): void {
+    this.http.get<RoleItem[]>('http://localhost:8080/api/v1/admin/roles').subscribe({
+      next: (roles) => {
+        if (roles && roles.length > 0) {
+          this.rolesDisponibles.set(roles);
+          // Actualizar etiquetas en la lista si ya cargó
+          if (this.usersList.length > 0) {
+            this.usersList = this.usersList.map(u => {
+              const badge = this.getRoleBadge(u.roleCode);
+              return { ...u, role: badge.name, roleClass: badge.cls };
+            });
+            this.onSearch();
+          }
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  getRoleBadge(roleCode: string): { name: string; cls: string } {
+    const found = this.rolesDisponibles().find(r => r.code === roleCode);
+    let cls = 'user';
+    if (roleCode === 'ROLE_SUPER_ADMIN') {
+      cls = 'super-admin';
+    } else if (roleCode === 'ROLE_ADMIN') {
+      cls = 'admin';
+    } else if (roleCode === 'ROLE_TECNICO') {
+      cls = 'tecnico';
+    } else if (roleCode === 'ROLE_EDITOR') {
+      cls = 'editor';
+    } else if (roleCode === 'ROLE_VISUALIZADOR') {
+      cls = 'visualizer';
+    } else if (roleCode === 'ROLE_ANALISTA') {
+      cls = 'analyst';
+    }
+
+    return {
+      name: found ? found.name : roleCode.replace('ROLE_', ''),
+      cls: cls
+    };
   }
 
   loadFromBackend(): void {
@@ -544,17 +610,8 @@ export class UserManagementComponent implements OnInit {
           this.usersList = res.content.map((u, i) => {
             const nameParts = u.fullName.split(' ');
             const inits = nameParts.length >= 2 ? (nameParts[0][0] + nameParts[1][0]).toUpperCase() : u.fullName.slice(0, 2).toUpperCase();
-            const isAdmin = u.roles.includes('ROLE_ADMIN') || u.roles.includes('ROLE_SUPER_ADMIN');
-            const isEditor = u.roles.includes('ROLE_EDITOR');
-            const isVisualizer = u.roles.includes('ROLE_VISUALIZADOR');
-            const isAnalyst = u.roles.includes('ROLE_ANALISTA');
-
-            let roleName = 'Usuario';
-            let roleCls = 'user';
-            if (isAdmin) { roleName = 'Administrador'; roleCls = 'admin'; }
-            else if (isEditor) { roleName = 'Editor'; roleCls = 'editor'; }
-            else if (isVisualizer) { roleName = 'Visualizador'; roleCls = 'visualizer'; }
-            else if (isAnalyst) { roleName = 'Analista'; roleCls = 'analyst'; }
+            const primaryRoleCode = (u.roles && u.roles.length > 0) ? u.roles[0] : 'ROLE_USER';
+            const badge = this.getRoleBadge(primaryRoleCode);
 
             return {
               id: u.id,
@@ -562,8 +619,9 @@ export class UserManagementComponent implements OnInit {
               avatarBg: colors[i % colors.length],
               name: u.fullName,
               email: u.email,
-              role: roleName,
-              roleClass: roleCls,
+              role: badge.name,
+              roleCode: primaryRoleCode,
+              roleClass: badge.cls,
               status: u.enabled ? 'Activo' : 'Inactivo',
               statusClass: u.enabled ? 'active' : 'inactive'
             };
@@ -590,10 +648,11 @@ export class UserManagementComponent implements OnInit {
   // GESTIÓN DEL MODAL DE CREACIÓN
   // =========================================================================
   openCreateModal(): void {
+    const defaultRole = this.rolesDisponibles().length > 0 ? this.rolesDisponibles()[0].code : 'ROLE_ANALISTA';
     this.createForm.reset({
       email: '',
       fullName: '',
-      role: 'Analista',
+      role: defaultRole,
       enabled: true
     });
     this.showCreateModal.set(true);
@@ -609,16 +668,10 @@ export class UserManagementComponent implements OnInit {
     this.isSaving.set(true);
     const val = this.createForm.value;
 
-    let roleCode = 'ROLE_USER';
-    if (val.role === 'Administrador') roleCode = 'ROLE_ADMIN';
-    else if (val.role === 'Editor') roleCode = 'ROLE_EDITOR';
-    else if (val.role === 'Visualizador') roleCode = 'ROLE_VISUALIZADOR';
-    else if (val.role === 'Analista') roleCode = 'ROLE_ANALISTA';
-
     this.http.post<UserDetail>('http://localhost:8080/api/v1/admin/users', {
       email: val.email,
       fullName: val.fullName,
-      roleCode: roleCode,
+      roleCode: val.role,
       enabled: val.enabled
     }).subscribe({
       next: () => {
@@ -659,7 +712,7 @@ export class UserManagementComponent implements OnInit {
     this.editForm.patchValue({
       fullName: row.name,
       email: row.email,
-      role: row.role,
+      role: row.roleCode || 'ROLE_USER',
       enabled: row.status === 'Activo'
     });
     this.showEditModal.set(true);
@@ -685,12 +738,6 @@ export class UserManagementComponent implements OnInit {
     const updatedVal = this.editForm.value;
     const current = this.editingUser()!;
 
-    let roleCode = 'ROLE_USER';
-    if (updatedVal.role === 'Administrador') roleCode = 'ROLE_ADMIN';
-    else if (updatedVal.role === 'Editor') roleCode = 'ROLE_EDITOR';
-    else if (updatedVal.role === 'Visualizador') roleCode = 'ROLE_VISUALIZADOR';
-    else if (updatedVal.role === 'Analista') roleCode = 'ROLE_ANALISTA';
-
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(current.id);
 
     if (isUUID) {
@@ -698,7 +745,7 @@ export class UserManagementComponent implements OnInit {
         fullName: updatedVal.fullName,
         enabled: updatedVal.enabled,
         accountNonLocked: true,
-        roles: [roleCode]
+        roles: [updatedVal.role]
       }).subscribe({
         next: () => {
           this.isSaving.set(false);
@@ -720,9 +767,9 @@ export class UserManagementComponent implements OnInit {
           this.closeEditModal();
           this.loadFromBackend();
           Swal.fire({
-            title: '¡Usuario Actualizado!',
-            text: `Usuario '${updatedVal.fullName}' actualizado localmente.`,
-            icon: 'success',
+            title: 'Error al actualizar',
+            text: err.error?.message || `No fue posible actualizar al usuario '${updatedVal.fullName}'.`,
+            icon: 'error',
             confirmButtonColor: '#0066ff',
             confirmButtonText: 'Aceptar'
           });

@@ -5,7 +5,6 @@ import com.empresa.seguridad.domain.model.Role;
 import com.empresa.seguridad.domain.model.User;
 import com.empresa.seguridad.domain.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

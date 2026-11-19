@@ -1,10 +1,15 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet, NavigationEnd } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatBadgeModule } from '@angular/material/badge';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
+import { EncuentrosService } from '../services/encuentros.service';
 
 @Component({
   selector: 'app-main-layout',
@@ -16,18 +21,32 @@ import { AuthService } from '../services/auth.service';
     RouterLinkActive,
     MatIconModule,
     MatButtonModule,
-    MatMenuModule
+    MatMenuModule,
+    MatBadgeModule,
+    MatTooltipModule
   ],
   template: `
-    <div class="app-layout">
+    <div class="app-layout" [class.sidebar-collapsed]="isSidebarCollapsed()">
+      <!-- BACKDROP PARA MÓVIL / PANTALLAS REDUCIDAS -->
+      @if (isMobileOpen()) {
+        <div class="sidebar-backdrop" (click)="closeMobileSidebar()"></div>
+      }
+
       <!-- SIDEBAR IZQUIERDO: FUTBOL S.A. -->
-      <aside class="app-sidebar">
+      <aside class="app-sidebar" 
+             [class.collapsed]="isSidebarCollapsed()" 
+             [class.mobile-open]="isMobileOpen()">
         <!-- Logo y Nombre -->
         <div class="sidebar-brand">
           <div class="shield-badge">
             <mat-icon>sports_soccer</mat-icon>
           </div>
           <h2 class="brand-title">FUTBOL S.A.</h2>
+          @if (isMobileView()) {
+            <button mat-icon-button type="button" class="btn-close-mobile-sidebar" (click)="closeMobileSidebar()" matTooltip="Cerrar menú">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
         </div>
 
         <!-- Menú de Navegación Vertical Condicionado por Rol -->
@@ -40,7 +59,7 @@ import { AuthService } from '../services/auth.service';
             </a>
           }
 
-          <!-- 2. Mi Perfil: Super Administrador, Administrador y Usuario -->
+          <!-- 2. Mi Perfil -->
           @if (authService.canAccessProfile()) {
             <a routerLink="/perfil" routerLinkActive="active" class="nav-item">
               <mat-icon>person</mat-icon>
@@ -48,7 +67,69 @@ import { AuthService } from '../services/auth.service';
             </a>
           }
 
-          <!-- 3. Seguridad: Módulo desplegable con Submenú -->
+          <!-- 3. Módulo ENCUENTROS: Desplegable con Submenú -->
+          @if (authService.canAccessEncuentrosMenu()) {
+            <div class="nav-group">
+              <button type="button" class="nav-item nav-group-trigger" 
+                      [class.child-active]="isEncuentrosRouteActive()" 
+                      (click)="toggleEncuentrosMenu()">
+                <div style="display: flex; align-items: center; gap: 0.85rem;">
+                  <mat-icon>sports</mat-icon>
+                  <span>Encuentros</span>
+                </div>
+                <mat-icon class="chevron-icon" [class.rotated]="isEncuentrosMenuOpen()">
+                  expand_more
+                </mat-icon>
+              </button>
+
+              @if (isEncuentrosMenuOpen()) {
+                <div class="submenu-container">
+                  <!-- A. Calendario de Reservas -->
+                  <a routerLink="/encuentros/reservas" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="subnav-item">
+                    <mat-icon>calendar_month</mat-icon>
+                    <span>Calendario Canchas</span>
+                  </a>
+
+                  <!-- B. Mis Reservas (Técnico / Admin) -->
+                  <a routerLink="/encuentros/reservas/mias" routerLinkActive="active" class="subnav-item">
+                    <mat-icon>event_available</mat-icon>
+                    <span>Mis Reservas</span>
+                  </a>
+
+                  <!-- C. Solicitudes de Canchas (Exclusivo Administrador) -->
+                  @if (authService.canAccessDashboard()) {
+                    <a routerLink="/encuentros/reservas/solicitudes" routerLinkActive="active" class="subnav-item">
+                      <mat-icon>rule</mat-icon>
+                      <span style="flex: 1;">Solicitudes Canchas</span>
+                      @if (conteoReservasPendientes() > 0) {
+                        <span class="sidebar-counter-badge">{{ conteoReservasPendientes() }}</span>
+                      }
+                    </a>
+
+                    <!-- D. Alertas Semáforo -->
+                    <a routerLink="/encuentros/reservas/alertas" routerLinkActive="active" class="subnav-item">
+                      <mat-icon>traffic</mat-icon>
+                      <span>Alertas Semáforo</span>
+                    </a>
+                  }
+
+                  <!-- E. Plantel de Jugadores -->
+                  <a routerLink="/encuentros/jugadores" routerLinkActive="active" class="subnav-item">
+                    <mat-icon>groups</mat-icon>
+                    <span>Jugadores</span>
+                  </a>
+
+                  <!-- F. Eventos / Partidos -->
+                  <a routerLink="/encuentros/eventos" routerLinkActive="active" class="subnav-item">
+                    <mat-icon>emoji_events</mat-icon>
+                    <span>Eventos Deportivos</span>
+                  </a>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- 4. Seguridad: Módulo desplegable con Submenú -->
           @if (authService.canAccessSecurityMenu()) {
             <div class="nav-group">
               <!-- Botón / Disparador Acordeón Seguridad -->
@@ -67,7 +148,18 @@ import { AuthService } from '../services/auth.service';
               <!-- Submenú con las opciones de Seguridad -->
               @if (isSecurityMenuOpen()) {
                 <div class="submenu-container">
-                  <!-- A. Usuarios: Super Administrador y Administrador -->
+                  <!-- A. Aprobación de Técnicos (Admin / SuperAdmin) -->
+                  @if (authService.canAccessTecnicosApproval()) {
+                    <a routerLink="/seguridad/aprobacion-usuarios" routerLinkActive="active" class="subnav-item">
+                      <mat-icon>how_to_reg</mat-icon>
+                      <span style="flex: 1;">Aprobación Técnicos</span>
+                      @if (conteoTecnicosPendientes() > 0) {
+                        <span class="sidebar-counter-badge">{{ conteoTecnicosPendientes() }}</span>
+                      }
+                    </a>
+                  }
+
+                  <!-- B. Usuarios: Super Administrador y Administrador -->
                   @if (authService.canAccessUsers()) {
                     <a routerLink="/usuarios" routerLinkActive="active" class="subnav-item">
                       <mat-icon>people</mat-icon>
@@ -75,7 +167,7 @@ import { AuthService } from '../services/auth.service';
                     </a>
                   }
 
-                  <!-- B. Roles y Permisos: Super Administrador y Administrador -->
+                  <!-- C. Roles y Permisos: Super Administrador y Administrador -->
                   @if (authService.canAccessRoles()) {
                     <a routerLink="/roles" routerLinkActive="active" class="subnav-item">
                       <mat-icon>security</mat-icon>
@@ -83,7 +175,7 @@ import { AuthService } from '../services/auth.service';
                     </a>
                   }
 
-                  <!-- C. Reportes: Super Administrador y Administrador -->
+                  <!-- D. Reportes: Super Administrador y Administrador -->
                   @if (authService.canAccessReports()) {
                     <a routerLink="/reportes" routerLinkActive="active" class="subnav-item">
                       <mat-icon>bar_chart</mat-icon>
@@ -91,7 +183,7 @@ import { AuthService } from '../services/auth.service';
                     </a>
                   }
 
-                  <!-- D. Configuración: EXCLUSIVO Super Administrador -->
+                  <!-- E. Configuración: EXCLUSIVO Super Administrador -->
                   @if (authService.canAccessConfig()) {
                     <a routerLink="/configuracion" routerLinkActive="active" class="subnav-item">
                       <mat-icon>settings</mat-icon>
@@ -102,6 +194,15 @@ import { AuthService } from '../services/auth.service';
               }
             </div>
           }
+
+          <!-- Acceso Directo a Landing Pública -->
+          <div style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.75rem;">
+            <a routerLink="/" target="_blank" class="nav-item public-portal-item">
+              <mat-icon style="color: #38bdf8;">public</mat-icon>
+              <span style="color: #e2e8f0;">Portal Público</span>
+              <mat-icon style="font-size: 16px; width: 16px; height: 16px; margin-left: auto; color: #94a3b8;">open_in_new</mat-icon>
+            </a>
+          </div>
 
           <!-- Usuario Estándar: Ningún acceso a opciones del menú -->
           @if (authService.hasNoMenuAccess()) {
@@ -127,8 +228,12 @@ import { AuthService } from '../services/auth.service';
         <!-- TOPBAR SUPERIOR -->
         <header class="app-topbar">
           <div class="topbar-left">
-            <button mat-icon-button type="button" style="color: #64748b;">
-              <mat-icon>menu</mat-icon>
+            <button mat-icon-button type="button" 
+                    class="btn-toggle-sidebar" 
+                    (click)="toggleSidebar()" 
+                    [matTooltip]="isSidebarCollapsed() && !isMobileView() ? 'Expandir menú lateral' : 'Contraer menú lateral'" 
+                    aria-label="Alternar menú lateral">
+              <mat-icon>{{ isSidebarCollapsed() && !isMobileView() ? 'menu' : 'menu_open' }}</mat-icon>
             </button>
           </div>
 
@@ -143,21 +248,29 @@ import { AuthService } from '../services/auth.service';
               </button>
 
               <mat-menu #roleMenu="matMenu">
-                <button mat-menu-item (click)="authService.switchActiveRoleForDemo('SUPER_ADMIN')">
+                <button mat-menu-item (click)="switchRole('SUPER_ADMIN')">
                   <mat-icon style="color: #0284c7;">admin_panel_settings</mat-icon>
-                  <span>Super Administrador (6 opciones)</span>
+                  <span>Super Administrador</span>
                 </button>
-                <button mat-menu-item (click)="authService.switchActiveRoleForDemo('ADMIN')">
+                <button mat-menu-item (click)="switchRole('ADMIN')">
                   <mat-icon style="color: #0369a1;">manage_accounts</mat-icon>
-                  <span>Administrador (5 opciones)</span>
+                  <span>Administrador</span>
                 </button>
-                <button mat-menu-item (click)="authService.switchActiveRoleForDemo('USER')">
-                  <mat-icon style="color: #16a34a;">person</mat-icon>
+                <button mat-menu-item (click)="switchRole('TECNICO_ACTIVO')">
+                  <mat-icon style="color: #16a34a;">sports</mat-icon>
+                  <span>Técnico (Activo)</span>
+                </button>
+                <button mat-menu-item (click)="switchRole('TECNICO_PENDIENTE')">
+                  <mat-icon style="color: #d97706;">hourglass_top</mat-icon>
+                  <span>Técnico (Pendiente)</span>
+                </button>
+                <button mat-menu-item (click)="switchRole('USER')">
+                  <mat-icon style="color: #64748b;">person</mat-icon>
                   <span>Usuario (Mi Perfil)</span>
                 </button>
-                <button mat-menu-item (click)="authService.switchActiveRoleForDemo('STANDARD')">
+                <button mat-menu-item (click)="switchRole('STANDARD')">
                   <mat-icon style="color: #ef4444;">block</mat-icon>
-                  <span>Usuario Estándar (Ningún acceso)</span>
+                  <span>Usuario Estándar (Sin acceso)</span>
                 </button>
               </mat-menu>
             </div>
@@ -192,16 +305,116 @@ import { AuthService } from '../services/auth.service';
         </main>
       </div>
     </div>
-  `
+  `,
+  styles: [`
+    .sidebar-counter-badge {
+      background: #ef4444;
+      color: #ffffff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.1rem 0.45rem;
+      border-radius: 10px;
+      margin-left: 0.5rem;
+    }
+
+    .public-portal-item:hover {
+      background: rgba(56, 189, 248, 0.12) !important;
+    }
+  `]
 })
-export class MainLayoutComponent {
+export class MainLayoutComponent implements OnInit, OnDestroy {
   public authService = inject(AuthService);
+  private encuentrosService = inject(EncuentrosService);
   private router = inject(Router);
 
   readonly isSecurityMenuOpen = signal<boolean>(true);
+  readonly isEncuentrosMenuOpen = signal<boolean>(true);
+
+  // Control de estado de menú lateral (Desktop y Móvil)
+  readonly isSidebarCollapsed = signal<boolean>(false);
+  readonly isMobileOpen = signal<boolean>(false);
+
+  // Señales reactivas sincronizadas en tiempo real desde el servicio
+  readonly conteoTecnicosPendientes = this.encuentrosService.conteoTecnicosPendientes;
+  readonly conteoReservasPendientes = this.encuentrosService.conteoReservasPendientes;
+
+  private navSub?: Subscription;
+  private intervalId?: any;
+
+  ngOnInit(): void {
+    // Restaurar preferencia guardada en Desktop
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('sidebar_collapsed');
+      if (saved === 'true' && !this.isMobileView()) {
+        this.isSidebarCollapsed.set(true);
+      }
+    }
+
+    this.cargarConteos();
+
+    // Actualizar conteos cada vez que el usuario navega entre pantallas
+    this.navSub = this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd)
+    ).subscribe(() => {
+      this.cargarConteos();
+      // En móvil cerrar el menú desplegado al cambiar de ruta
+      if (this.isMobileView()) {
+        this.isMobileOpen.set(false);
+      }
+    });
+
+    // Sondeo de respaldo periódico cada 15 segundos
+    this.intervalId = setInterval(() => {
+      this.cargarConteos();
+    }, 15000);
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    if (!this.isMobileView() && this.isMobileOpen()) {
+      this.isMobileOpen.set(false);
+    }
+  }
+
+  isMobileView(): boolean {
+    return typeof window !== 'undefined' && window.innerWidth <= 992;
+  }
+
+  toggleSidebar(): void {
+    if (this.isMobileView()) {
+      this.isMobileOpen.update(v => !v);
+    } else {
+      this.isSidebarCollapsed.update(v => {
+        const next = !v;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('sidebar_collapsed', String(next));
+        }
+        return next;
+      });
+    }
+  }
+
+  closeMobileSidebar(): void {
+    this.isMobileOpen.set(false);
+  }
+
+  ngOnDestroy(): void {
+    this.navSub?.unsubscribe();
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
+  }
+
+  cargarConteos(): void {
+    this.encuentrosService.actualizarConteosMenu();
+  }
 
   toggleSecurityMenu(): void {
     this.isSecurityMenuOpen.update(v => !v);
+  }
+
+  toggleEncuentrosMenu(): void {
+    this.isEncuentrosMenuOpen.update(v => !v);
   }
 
   isSecurityRouteActive(): boolean {
@@ -209,19 +422,32 @@ export class MainLayoutComponent {
     return url.startsWith('/usuarios') || 
            url.startsWith('/roles') || 
            url.startsWith('/reportes') || 
-           url.startsWith('/configuracion');
+           url.startsWith('/configuracion') ||
+           url.startsWith('/seguridad');
+  }
+
+  isEncuentrosRouteActive(): boolean {
+    const url = this.router.url;
+    return url.startsWith('/encuentros');
+  }
+
+  switchRole(role: 'SUPER_ADMIN' | 'ADMIN' | 'TECNICO_ACTIVO' | 'TECNICO_PENDIENTE' | 'USER' | 'STANDARD'): void {
+    this.authService.switchActiveRoleForDemo(role);
+    setTimeout(() => this.cargarConteos(), 300);
   }
 
   activeRoleLabel(): string {
     if (this.authService.isSuperAdmin()) return 'Super Administrador';
     if (this.authService.userRoles().includes('ROLE_ADMIN')) return 'Administrador';
+    if (this.authService.isTecnicoActivo()) return 'Técnico (Activo)';
+    if (this.authService.isTecnicoPendiente()) return 'Técnico (Pendiente)';
     if (this.authService.isUser()) return 'Usuario';
     if (this.authService.isStandardUser() || this.authService.hasNoMenuAccess()) return 'Usuario Estándar';
     return 'Usuario';
   }
 
   userName(): string {
-    return this.authService.currentUser()?.fullName || 'Juan Pérez';
+    return this.authService.currentUser()?.fullName || 'Usuario';
   }
 
   userInitials(): string {

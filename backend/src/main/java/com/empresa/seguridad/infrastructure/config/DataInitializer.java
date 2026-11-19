@@ -1,6 +1,7 @@
 package com.empresa.seguridad.infrastructure.config;
 
 import com.empresa.seguridad.domain.model.AuditLog;
+import com.empresa.seguridad.domain.model.EstadoAprobacion;
 import com.empresa.seguridad.domain.model.Permission;
 import com.empresa.seguridad.domain.model.Role;
 import com.empresa.seguridad.domain.model.SystemConfiguration;
@@ -10,6 +11,20 @@ import com.empresa.seguridad.domain.repository.PermissionRepository;
 import com.empresa.seguridad.domain.repository.RoleRepository;
 import com.empresa.seguridad.domain.repository.SystemConfigurationRepository;
 import com.empresa.seguridad.domain.repository.UserRepository;
+import com.empresa.seguridad.encuentros.domain.model.Cancha;
+import com.empresa.seguridad.encuentros.domain.model.Encuentro;
+import com.empresa.seguridad.encuentros.domain.model.Equipo;
+import com.empresa.seguridad.encuentros.domain.model.EstadoEncuentro;
+import com.empresa.seguridad.encuentros.domain.model.EstadoReserva;
+import com.empresa.seguridad.encuentros.domain.model.Jugador;
+import com.empresa.seguridad.encuentros.domain.model.Notificacion;
+import com.empresa.seguridad.encuentros.domain.model.Reserva;
+import com.empresa.seguridad.encuentros.domain.repository.CanchaRepository;
+import com.empresa.seguridad.encuentros.domain.repository.EncuentroRepository;
+import com.empresa.seguridad.encuentros.domain.repository.EquipoRepository;
+import com.empresa.seguridad.encuentros.domain.repository.JugadorRepository;
+import com.empresa.seguridad.encuentros.domain.repository.NotificacionRepository;
+import com.empresa.seguridad.encuentros.domain.repository.ReservaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -17,7 +32,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 
 @Slf4j
@@ -31,6 +49,12 @@ public class DataInitializer implements CommandLineRunner {
     private final SystemConfigurationRepository configRepository;
     private final AuditLogRepository auditLogRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CanchaRepository canchaRepository;
+    private final ReservaRepository reservaRepository;
+    private final JugadorRepository jugadorRepository;
+    private final EncuentroRepository encuentroRepository;
+    private final EquipoRepository equipoRepository;
+    private final NotificacionRepository notificacionRepository;
 
     @Override
     @Transactional
@@ -56,6 +80,9 @@ public class DataInitializer implements CommandLineRunner {
 
         // 5. Auditorías Iniciales para Reportes
         initAuditLogs(users);
+
+        // 6. Datos Semilla Módulo Encuentros
+        initEncuentrosModuleData(users);
 
         log.info("✅ Inicialización de datos semilla completada con éxito en H2.");
     }
@@ -170,6 +197,16 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
         map.put(analista.getCode(), roleRepository.save(analista));
 
+        // TÉCNICO (Módulo Encuentros)
+        Role tecnico = Role.builder()
+                .code("ROLE_TECNICO")
+                .name("Técnico")
+                .description("Organizador de encuentros, reservas y jugadores")
+                .isSystemRole(true)
+                .permissions(Set.of(permissions.get("USER_READ")))
+                .build();
+        map.put(tecnico.getCode(), roleRepository.save(tecnico));
+
         return map;
     }
 
@@ -183,6 +220,7 @@ public class DataInitializer implements CommandLineRunner {
                 .passwordHash(passwordEncoder.encode("Admin$Tr0ng_2026!"))
                 .enabled(true)
                 .accountNonLocked(true)
+                .estadoAprobacion(EstadoAprobacion.ACTIVO)
                 .roles(Set.of(roles.get("ROLE_SUPER_ADMIN"), roles.get("ROLE_ADMIN")))
                 .build();
         map.put("admin", userRepository.save(superAdmin));
@@ -194,6 +232,7 @@ public class DataInitializer implements CommandLineRunner {
                 .passwordHash(passwordEncoder.encode("Juan$Perez_2026!"))
                 .enabled(true)
                 .accountNonLocked(true)
+                .estadoAprobacion(EstadoAprobacion.ACTIVO)
                 .roles(Set.of(roles.get("ROLE_ADMIN")))
                 .build();
         map.put("juan", userRepository.save(juan));
@@ -205,6 +244,7 @@ public class DataInitializer implements CommandLineRunner {
                 .passwordHash(passwordEncoder.encode("Maria$Lopez_2026!"))
                 .enabled(true)
                 .accountNonLocked(true)
+                .estadoAprobacion(EstadoAprobacion.ACTIVO)
                 .roles(Set.of(roles.get("ROLE_EDITOR")))
                 .build();
         map.put("maria", userRepository.save(maria));
@@ -216,6 +256,7 @@ public class DataInitializer implements CommandLineRunner {
                 .passwordHash(passwordEncoder.encode("Carlos$Ruiz_2026!"))
                 .enabled(true)
                 .accountNonLocked(true)
+                .estadoAprobacion(EstadoAprobacion.ACTIVO)
                 .roles(Set.of(roles.get("ROLE_VISUALIZADOR")))
                 .build();
         map.put("carlos", userRepository.save(carlos));
@@ -227,6 +268,7 @@ public class DataInitializer implements CommandLineRunner {
                 .passwordHash(passwordEncoder.encode("Ana$Garcia_2026!"))
                 .enabled(true)
                 .accountNonLocked(true)
+                .estadoAprobacion(EstadoAprobacion.ACTIVO)
                 .roles(Set.of(roles.get("ROLE_ANALISTA")))
                 .build();
         map.put("ana", userRepository.save(ana));
@@ -238,6 +280,7 @@ public class DataInitializer implements CommandLineRunner {
                 .passwordHash(passwordEncoder.encode("User$Pass_2026!"))
                 .enabled(true)
                 .accountNonLocked(true)
+                .estadoAprobacion(EstadoAprobacion.ACTIVO)
                 .roles(Set.of(roles.get("ROLE_USER")))
                 .build();
         map.put("regular", userRepository.save(regularUser));
@@ -249,9 +292,49 @@ public class DataInitializer implements CommandLineRunner {
                 .passwordHash(passwordEncoder.encode("Estandar$Pass_2026!"))
                 .enabled(true)
                 .accountNonLocked(true)
+                .estadoAprobacion(EstadoAprobacion.ACTIVO)
                 .roles(Set.of(roles.get("ROLE_STANDARD")))
                 .build();
         map.put("standard", userRepository.save(standardUser));
+
+        // 8. Admin Demo (Sección 20 - Semillas Módulo Encuentros)
+        User adminDemo = User.builder()
+                .email("admin@demo.pe")
+                .fullName("Administrador Demo")
+                .telefono("999888777")
+                .passwordHash(passwordEncoder.encode("Admin$Demo_2026!"))
+                .enabled(true)
+                .accountNonLocked(true)
+                .estadoAprobacion(EstadoAprobacion.ACTIVO)
+                .roles(Set.of(roles.get("ROLE_ADMIN"), roles.get("ROLE_SUPER_ADMIN")))
+                .build();
+        map.put("adminDemo", userRepository.save(adminDemo));
+
+        // 9. Técnico 1 Demo (ACTIVO)
+        User tecnico1 = User.builder()
+                .email("tecnico1@demo.pe")
+                .fullName("Roberto Carlos")
+                .telefono("987654321")
+                .passwordHash(passwordEncoder.encode("Tecnico1$Pass_2026!"))
+                .enabled(true)
+                .accountNonLocked(true)
+                .estadoAprobacion(EstadoAprobacion.ACTIVO)
+                .roles(Set.of(roles.get("ROLE_TECNICO")))
+                .build();
+        map.put("tecnico1", userRepository.save(tecnico1));
+
+        // 10. Técnico 2 Demo (PENDIENTE)
+        User tecnico2 = User.builder()
+                .email("tecnico2@demo.pe")
+                .fullName("Zinedine Zidane")
+                .telefono("912345678")
+                .passwordHash(passwordEncoder.encode("Tecnico2$Pass_2026!"))
+                .enabled(true)
+                .accountNonLocked(true)
+                .estadoAprobacion(EstadoAprobacion.PENDIENTE)
+                .roles(Set.of(roles.get("ROLE_TECNICO")))
+                .build();
+        map.put("tecnico2", userRepository.save(tecnico2));
 
         log.info("✅ Usuarios iniciales creados exitosamente en H2.");
         return map;
@@ -329,5 +412,169 @@ public class DataInitializer implements CommandLineRunner {
 
         auditLogRepository.saveAll(initialLogs);
         log.info("✅ Eventos de auditoría semilla cargados exitosamente.");
+    }
+
+    private void initEncuentrosModuleData(Map<String, User> users) {
+        log.info("Iniciando carga de semillas del Módulo Encuentros...");
+        LocalDate hoy = LocalDate.now();
+
+        User admin = users.get("adminDemo");
+        User tecnico1 = users.get("tecnico1");
+        User tecnico2 = users.get("tecnico2");
+
+        // 1. Canchas
+        Cancha c1 = canchaRepository.save(Cancha.builder().nombre("Cancha 1").tipo("F5").tarifaHora(BigDecimal.valueOf(80.00)).activa(true).build());
+        Cancha c2 = canchaRepository.save(Cancha.builder().nombre("Cancha 2").tipo("F7").tarifaHora(BigDecimal.valueOf(120.00)).activa(true).build());
+        Cancha c3 = canchaRepository.save(Cancha.builder().nombre("Cancha 3").tipo("F11").tarifaHora(BigDecimal.valueOf(200.00)).activa(true).build());
+
+        // 2. Jugadores (12 para tecnico1)
+        List<Jugador> jugadores = List.of(
+                Jugador.builder().tecnico(tecnico1).nombre("Carlos Ramos").apodo("El Rayo").posicion("delantero").estrellas(5).activo(true).build(),
+                Jugador.builder().tecnico(tecnico1).nombre("Pedro Gallese").apodo("El Pulpo").posicion("portero").estrellas(5).activo(true).build(),
+                Jugador.builder().tecnico(tecnico1).nombre("Renato Tapia").apodo("El Capitán").posicion("medio").estrellas(4).activo(true).build(),
+                Jugador.builder().tecnico(tecnico1).nombre("Luis Advíncula").apodo("Bolt").posicion("defensa").estrellas(4).activo(true).build(),
+                Jugador.builder().tecnico(tecnico1).nombre("Christian Cueva").apodo("Aladino").posicion("medio").estrellas(4).activo(true).build(),
+                Jugador.builder().tecnico(tecnico1).nombre("Gianluca Lapadula").apodo("El Bambino").posicion("delantero").estrellas(4).activo(true).build(),
+                Jugador.builder().tecnico(tecnico1).nombre("Yoshimar Yotún").apodo("Yoshi").posicion("medio").estrellas(3).activo(true).build(),
+                Jugador.builder().tecnico(tecnico1).nombre("Edison Flores").apodo("Orejas").posicion("medio").estrellas(3).activo(true).build(),
+                Jugador.builder().tecnico(tecnico1).nombre("Alexander Callens").apodo("Iron").posicion("defensa").estrellas(3).activo(true).build(),
+                Jugador.builder().tecnico(tecnico1).nombre("Miguel Trauco").apodo("El Genio").posicion("defensa").estrellas(3).activo(true).build(),
+                Jugador.builder().tecnico(tecnico1).nombre("Anderson Santamaría").apodo("La Muralla").posicion("defensa").estrellas(2).activo(true).build(),
+                Jugador.builder().tecnico(tecnico1).nombre("Raúl Ruidíaz").apodo("La Pulga").posicion("delantero").estrellas(2).activo(true).build()
+        );
+        List<Jugador> savedJugadores = jugadorRepository.saveAll(jugadores);
+
+        // 3. Reservas para cada color del semáforo
+        // A. Hoy (0 días) - PENDIENTE (🔴 ROJO)
+        reservaRepository.save(Reserva.builder()
+                .cancha(c1)
+                .tecnico(tecnico1)
+                .fecha(hoy)
+                .horaInicio(LocalTime.of(19, 0))
+                .horaFin(LocalTime.of(20, 30))
+                .monto(BigDecimal.valueOf(120.00))
+                .estado(EstadoReserva.PENDIENTE)
+                .creadaPor(tecnico1)
+                .build());
+
+        // B. +2 días - PENDIENTE (🔴 ROJO)
+        reservaRepository.save(Reserva.builder()
+                .cancha(c2)
+                .tecnico(tecnico1)
+                .fecha(hoy.plusDays(2))
+                .horaInicio(LocalTime.of(18, 0))
+                .horaFin(LocalTime.of(20, 0))
+                .monto(BigDecimal.valueOf(240.00))
+                .estado(EstadoReserva.PENDIENTE)
+                .creadaPor(tecnico1)
+                .build());
+
+        // C. +3 días - PENDIENTE (🟠 ÁMBAR)
+        reservaRepository.save(Reserva.builder()
+                .cancha(c1)
+                .tecnico(tecnico1)
+                .fecha(hoy.plusDays(3))
+                .horaInicio(LocalTime.of(20, 0))
+                .horaFin(LocalTime.of(21, 30))
+                .monto(BigDecimal.valueOf(120.00))
+                .estado(EstadoReserva.PENDIENTE)
+                .creadaPor(tecnico1)
+                .build());
+
+        // D. +5 días - PENDIENTE (🟢 VERDE)
+        reservaRepository.save(Reserva.builder()
+                .cancha(c3)
+                .tecnico(tecnico1)
+                .fecha(hoy.plusDays(5))
+                .horaInicio(LocalTime.of(17, 0))
+                .horaFin(LocalTime.of(19, 0))
+                .monto(BigDecimal.valueOf(400.00))
+                .estado(EstadoReserva.PENDIENTE)
+                .creadaPor(tecnico1)
+                .build());
+
+        // E. +4 días - APROBADA (futura, sin encuentro para que el técnico pueda crear uno)
+        reservaRepository.save(Reserva.builder()
+                .cancha(c2)
+                .tecnico(tecnico1)
+                .fecha(hoy.plusDays(4))
+                .horaInicio(LocalTime.of(19, 0))
+                .horaFin(LocalTime.of(21, 0))
+                .monto(BigDecimal.valueOf(240.00))
+                .estado(EstadoReserva.APROBADA)
+                .creadaPor(tecnico1)
+                .decididaPor(admin)
+                .fechaDecision(LocalDateTime.now())
+                .build());
+
+        // F. -1 día - RECHAZADA (con motivo de rechazo)
+        reservaRepository.save(Reserva.builder()
+                .cancha(c1)
+                .tecnico(tecnico1)
+                .fecha(hoy.minusDays(1))
+                .horaInicio(LocalTime.of(15, 0))
+                .horaFin(LocalTime.of(16, 30))
+                .monto(BigDecimal.valueOf(120.00))
+                .estado(EstadoReserva.RECHAZADA)
+                .motivoRechazo("Comprobante de pago ilegible o adulterado")
+                .creadaPor(tecnico1)
+                .decididaPor(admin)
+                .fechaDecision(LocalDateTime.now().minusDays(1))
+                .build());
+
+        // G. +1 día - APROBADA (para albergar el encuentro PUBLICADO inicial)
+        Reserva resConEncuentro = reservaRepository.save(Reserva.builder()
+                .cancha(c1)
+                .tecnico(tecnico1)
+                .fecha(hoy.plusDays(1))
+                .horaInicio(LocalTime.of(19, 30))
+                .horaFin(LocalTime.of(21, 30))
+                .monto(BigDecimal.valueOf(160.00))
+                .estado(EstadoReserva.APROBADA)
+                .creadaPor(tecnico1)
+                .decididaPor(admin)
+                .fechaDecision(LocalDateTime.now().minusHours(2))
+                .build());
+
+        // 4. Encuentro PUBLICADO inicial con 2 equipos de 6 jugadores
+        Encuentro encuentro = Encuentro.builder()
+                .reserva(resConEncuentro)
+                .tecnico(tecnico1)
+                .nombre("Gran Copa Amistosa de Verano")
+                .apuestaMonto(BigDecimal.valueOf(50.00))
+                .estado(EstadoEncuentro.PUBLICADO)
+                .creadoEn(LocalDateTime.now().minusHours(3))
+                .publicadoEn(LocalDateTime.now().minusHours(2))
+                .build();
+        Encuentro savedEncuentro = encuentroRepository.save(encuentro);
+
+        // Equipos
+        Equipo eqRojo = Equipo.builder()
+                .encuentro(savedEncuentro)
+                .nombre("Equipo Rojo")
+                .color("#DC2626")
+                .jugadores(new ArrayList<>(savedJugadores.subList(0, 6)))
+                .build();
+
+        Equipo eqAzul = Equipo.builder()
+                .encuentro(savedEncuentro)
+                .nombre("Equipo Azul")
+                .color("#0066FF")
+                .jugadores(new ArrayList<>(savedJugadores.subList(6, 12)))
+                .build();
+
+        equipoRepository.saveAll(List.of(eqRojo, eqAzul));
+
+        // 5. Notificación inicial al Admin sobre técnico pendiente
+        notificacionRepository.save(Notificacion.builder()
+                .usuario(admin)
+                .tipo("REGISTRO_TECNICO")
+                .titulo("Nuevo técnico registrado")
+                .mensaje("Zinedine Zidane (" + tecnico2.getEmail() + ") ha solicitado registro como Técnico y espera aprobación.")
+                .enlace("/seguridad/aprobacion-usuarios")
+                .leida(false)
+                .build());
+
+        log.info("✅ Semillas del Módulo Encuentros cargadas exitosamente.");
     }
 }

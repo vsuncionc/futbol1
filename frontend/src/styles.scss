@@ -313,6 +313,7 @@ html, body {
   display: flex;
   height: 100vh;
   overflow: hidden;
+  position: relative;
 }
 
 .app-sidebar {
@@ -322,7 +323,19 @@ html, body {
   flex-direction: column;
   flex-shrink: 0;
   color: #ffffff;
-  transition: width 0.25s ease;
+  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s ease;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 1000;
+
+  &.collapsed {
+    margin-left: -250px;
+    opacity: 0;
+    pointer-events: none;
+  }
 
   .sidebar-brand {
     padding: 1.75rem 1.25rem 1.5rem 1.25rem;
@@ -354,6 +367,15 @@ html, body {
       color: #ffffff;
       margin: 0;
       text-transform: uppercase;
+    }
+
+    .btn-close-mobile-sidebar {
+      margin-left: auto;
+      color: #94a3b8;
+      &:hover {
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.1);
+      }
     }
   }
 
@@ -536,6 +558,8 @@ html, body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
+  transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .app-topbar {
@@ -551,7 +575,35 @@ html, body {
   .topbar-left {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
+
+    .btn-toggle-sidebar {
+      color: #475569;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      cursor: pointer;
+
+      &:hover {
+        background-color: #f1f5f9;
+        color: #0066ff;
+        transform: scale(1.05);
+      }
+
+      &:active {
+        transform: scale(0.95);
+      }
+
+      mat-icon {
+        font-size: 24px;
+        width: 24px;
+        height: 24px;
+      }
+    }
   }
 
   .topbar-right {
@@ -711,6 +763,8 @@ html, body {
   }
 
   &.admin { background: #e0f2fe; color: #0284c7; }
+  &.super-admin { background: #fae8ff; color: #86198f; }
+  &.tecnico { background: #e0e7ff; color: #4338ca; }
   &.editor { background: #dcfce7; color: #15803d; }
   &.visualizer { background: #f3e8ff; color: #7e22ce; }
   &.analyst { background: #fef3c7; color: #b45309; }
@@ -1147,5 +1201,47 @@ html, body {
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE SIDEBAR: OFF-CANVAS DRAWER & BACKDROP
+   ========================================================================== */
+@media (max-width: 992px) {
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100vh;
+    z-index: 1200;
+    transform: translateX(-100%);
+    margin-left: 0 !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    box-shadow: none;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &.mobile-open {
+      transform: translateX(0);
+      box-shadow: 6px 0 28px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(2px);
+    z-index: 1150;
+    animation: fadeInBackdrop 0.2s ease-out;
+  }
+
+  @keyframes fadeInBackdrop {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 }

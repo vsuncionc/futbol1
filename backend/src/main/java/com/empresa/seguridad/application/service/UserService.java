@@ -15,8 +15,6 @@ import com.empresa.seguridad.domain.repository.SystemConfigurationRepository;
 import com.empresa.seguridad.domain.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -55,7 +53,15 @@ public class UserService {
                 .map(p -> p.getCode())
                 .collect(Collectors.toSet());
 
-        return new UserSummaryDto(user.getId(), user.getEmail(), user.getFullName(), roles, permissions);
+        return new UserSummaryDto(
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getTelefono(),
+                user.getEstadoAprobacion(),
+                roles,
+                permissions
+        );
     }
 
     @Transactional
@@ -252,6 +258,10 @@ public class UserService {
                 user.getId(),
                 user.getEmail(),
                 user.getFullName(),
+                user.getTelefono(),
+                user.getEstadoAprobacion(),
+                user.getMotivoRechazo(),
+                user.getFechaDecision(),
                 user.isEnabled(),
                 user.isAccountNonLocked(),
                 user.getFailedLoginAttempts(),

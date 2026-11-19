@@ -2,6 +2,8 @@ export interface UserSummary {
   id: string;
   email: string;
   fullName: string;
+  telefono?: string;
+  estadoAprobacion?: 'PENDIENTE' | 'ACTIVO' | 'RECHAZADO' | 'SUSPENDIDO';
   roles: string[];
   permissions: string[];
 }

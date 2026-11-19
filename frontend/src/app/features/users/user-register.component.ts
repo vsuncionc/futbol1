@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -10,6 +10,15 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import Swal from 'sweetalert2';
+
+export interface RoleItem {
+  id?: string;
+  code: string;
+  name: string;
+  description?: string;
+  isSystemRole?: boolean;
+}
 
 @Component({
   selector: 'app-user-register',
@@ -33,18 +42,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
         <mat-icon>person_add</mat-icon>
         <span>Registrar Usuario</span>
       </h1>
-      <p>Completa la información del nuevo usuario</p>
+      <p>Completa la información del nuevo usuario y asigna su rol en el sistema</p>
     </div>
 
     <!-- TARJETA FORMULARIO -->
     <div class="white-panel-card" style="max-width: 780px;">
-      @if (successMessage()) {
-        <div class="alert-box success" style="margin-bottom: 1.5rem;">
-          <mat-icon>check_circle</mat-icon>
-          <span>{{ successMessage() }}</span>
-        </div>
-      }
-
       <form [formGroup]="userForm" (ngSubmit)="onSubmit()">
         <!-- Correo Electrónico * -->
         <div style="margin-bottom: 1.25rem;">
@@ -53,6 +55,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
           </label>
           <mat-form-field appearance="outline" style="width: 100%;">
             <input matInput type="email" formControlName="email" placeholder="nuevo@empresa.com">
+            @if (userForm.get('email')?.touched && userForm.get('email')?.hasError('required')) {
+              <mat-error>El correo es obligatorio.</mat-error>
+            }
+            @if (userForm.get('email')?.touched && userForm.get('email')?.hasError('email')) {
+              <mat-error>Formato de correo inválido.</mat-error>
+            }
           </mat-form-field>
         </div>
 
@@ -63,6 +71,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
           </label>
           <mat-form-field appearance="outline" style="width: 100%;">
             <input matInput formControlName="fullName" placeholder="Ana García López">
+            @if (userForm.get('fullName')?.touched && userForm.get('fullName')?.hasError('required')) {
+              <mat-error>El nombre es obligatorio.</mat-error>
+            }
           </mat-form-field>
         </div>
 
@@ -74,10 +85,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
             </label>
             <mat-form-field appearance="outline" style="width: 100%;">
               <mat-select formControlName="role">
-                <mat-option value="Analista">Analista</mat-option>
-                <mat-option value="Administrador">Administrador</mat-option>
-                <mat-option value="Editor">Editor</mat-option>
-                <mat-option value="Visualizador">Visualizador</mat-option>
+                @for (rol of rolesDisponibles(); track rol.code) {
+                  <mat-option [value]="rol.code">
+                    {{ rol.name }} ({{ rol.code }})
+                  </mat-option>
+                }
               </mat-select>
             </mat-form-field>
           </div>
@@ -88,7 +100,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
             </label>
             <div style="display: flex; align-items: center; gap: 0.75rem;">
               <mat-slide-toggle formControlName="enabled" color="primary">
-                <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">
+                <span style="font-size: 0.9rem; font-weight: 600;" [style.color]="userForm.get('enabled')?.value ? '#16a34a' : '#dc2626'">
                   {{ userForm.get('enabled')?.value ? 'Activo' : 'Inactivo' }}
                 </span>
               </mat-slide-toggle>
@@ -102,7 +114,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
             @if (isSubmitting()) {
               <mat-spinner diameter="20" style="margin-right: 8px; display: inline-block;"></mat-spinner>
             } @else {
-              <mat-icon style="margin-right: 4px;">check</mat-icon>
+              <mat-icon style="margin-right: 4px;">how_to_reg</mat-icon>
             }
             <span>Registrar Usuario</span>
           </button>
@@ -116,42 +128,87 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
     </div>
   `
 })
-export class UserRegisterComponent {
+export class UserRegisterComponent implements OnInit {
   private fb = inject(FormBuilder);
   private router = inject(Router);
   private http = inject(HttpClient);
 
   readonly isSubmitting = signal(false);
-  readonly successMessage = signal<string | null>(null);
+
+  // Lista de todos los roles habilitados en el sistema
+  readonly rolesDisponibles = signal<RoleItem[]>([
+    { code: 'ROLE_SUPER_ADMIN', name: 'Super Administrador' },
+    { code: 'ROLE_ADMIN', name: 'Administrador' },
+    { code: 'ROLE_TECNICO', name: 'Técnico' },
+    { code: 'ROLE_ANALISTA', name: 'Analista' },
+    { code: 'ROLE_EDITOR', name: 'Editor' },
+    { code: 'ROLE_VISUALIZADOR', name: 'Visualizador' },
+    { code: 'ROLE_USER', name: 'Usuario' },
+    { code: 'ROLE_STANDARD', name: 'Usuario Estándar' }
+  ]);
 
   userForm: FormGroup = this.fb.group({
-    email: ['nuevo@empresa.com', [Validators.required, Validators.email]],
-    fullName: ['Ana García López', [Validators.required]],
-    role: ['Analista', [Validators.required]],
+    email: ['', [Validators.required, Validators.email]],
+    fullName: ['', [Validators.required, Validators.minLength(3)]],
+    role: ['ROLE_ANALISTA', [Validators.required]],
     enabled: [true]
   });
+
+  ngOnInit(): void {
+    this.cargarRoles();
+  }
+
+  cargarRoles(): void {
+    this.http.get<RoleItem[]>('http://localhost:8080/api/v1/admin/roles').subscribe({
+      next: (data) => {
+        if (data && data.length > 0) {
+          this.rolesDisponibles.set(data);
+          // Si el rol actual no está en la lista recibida, fijar el primero
+          const currentRole = this.userForm.get('role')?.value;
+          if (!data.some(r => r.code === currentRole)) {
+            this.userForm.patchValue({ role: data[0].code });
+          }
+        }
+      },
+      error: () => { }
+    });
+  }
 
   onSubmit(): void {
     if (this.userForm.invalid) return;
 
     this.isSubmitting.set(true);
-    this.successMessage.set(null);
+    const val = this.userForm.value;
 
-    // Registra al usuario
-    this.http.post('http://localhost:8080/api/v1/auth/register', {
-      fullName: this.userForm.value.fullName,
-      email: this.userForm.value.email,
-      password: 'User$Pass_2026!'
+    // Registra al usuario a través del endpoint de administración con su rol correspondiente
+    this.http.post('http://localhost:8080/api/v1/admin/users', {
+      fullName: val.fullName,
+      email: val.email,
+      roleCode: val.role,
+      enabled: val.enabled
     }).subscribe({
       next: () => {
         this.isSubmitting.set(false);
-        this.successMessage.set('Usuario registrado exitosamente.');
-        setTimeout(() => this.router.navigate(['/usuarios']), 1500);
+        Swal.fire({
+          icon: 'success',
+          title: '¡Usuario Registrado!',
+          text: `El usuario '${val.fullName}' ha sido creado exitosamente con el rol seleccionado.`,
+          confirmButtonColor: '#0066ff',
+          confirmButtonText: 'Aceptar'
+        }).then(() => {
+          this.router.navigate(['/usuarios']);
+        });
       },
-      error: () => {
+      error: (err) => {
         this.isSubmitting.set(false);
-        this.successMessage.set('Usuario registrado en la interfaz de gestión.');
-        setTimeout(() => this.router.navigate(['/usuarios']), 1500);
+        const errMsg = err.error?.message || 'No fue posible registrar el usuario.';
+        Swal.fire({
+          icon: 'error',
+          title: 'Error al registrar',
+          text: errMsg,
+          confirmButtonColor: '#ef4444',
+          confirmButtonText: 'Entendido'
+        });
       }
     });
   }

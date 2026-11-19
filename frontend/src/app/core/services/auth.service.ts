@@ -27,23 +27,29 @@ export class AuthService {
   readonly isAdmin = computed(() => this.userRoles().includes('ROLE_ADMIN') && !this.isSuperAdmin());
   readonly isUser = computed(() => (this.userRoles().includes('ROLE_USER') || this.userRoles().includes('ROLE_EDITOR') || this.userRoles().includes('ROLE_VISUALIZADOR') || this.userRoles().includes('ROLE_ANALISTA')) && !this.userRoles().includes('ROLE_ADMIN') && !this.isSuperAdmin());
   readonly isStandardUser = computed(() => this.userRoles().includes('ROLE_STANDARD'));
+  readonly isTecnico = computed(() => this.userRoles().includes('ROLE_TECNICO'));
+  readonly isTecnicoActivo = computed(() => this.isTecnico() && this.currentUser()?.estadoAprobacion === 'ACTIVO');
+  readonly isTecnicoPendiente = computed(() => this.isTecnico() && this.currentUser()?.estadoAprobacion === 'PENDIENTE');
 
   // =========================================================================
-  // MATRIZ DE ACCESO A OPCIONES DEL MENÚ SEGÚN ESPECIFICACIÓN:
-  // - Super Administrador : Dashboard, Mi Perfil, Usuarios, Roles y Permisos, Reportes, Configuración
-  // - Administrador: Dashboard, Mi Perfil, Usuarios, Roles y Permisos, Reportes
-  // - Usuario: Mi Perfil
-  // - Usuario Estándar: Ningún acceso
+  // MATRIZ DE ACCESO A OPCIONES DEL MENÚ:
   // =========================================================================
   readonly canAccessDashboard = computed(() => this.isSuperAdmin() || this.userRoles().includes('ROLE_ADMIN'));
-  readonly canAccessProfile = computed(() => this.isSuperAdmin() || this.userRoles().includes('ROLE_ADMIN') || this.isUser());
+  readonly canAccessProfile = computed(() => this.isSuperAdmin() || this.userRoles().includes('ROLE_ADMIN') || this.isUser() || this.isTecnico());
   readonly canAccessUsers = computed(() => this.isSuperAdmin() || this.userRoles().includes('ROLE_ADMIN'));
   readonly canAccessRoles = computed(() => this.isSuperAdmin() || this.userRoles().includes('ROLE_ADMIN'));
   readonly canAccessReports = computed(() => this.isSuperAdmin() || this.userRoles().includes('ROLE_ADMIN'));
   readonly canAccessConfig = computed(() => this.isSuperAdmin());
+  readonly canAccessTecnicosApproval = computed(() => this.isSuperAdmin() || this.userRoles().includes('ROLE_ADMIN'));
   readonly canAccessSecurityMenu = computed(() => 
-    this.canAccessUsers() || this.canAccessRoles() || this.canAccessReports() || this.canAccessConfig()
+    this.canAccessUsers() || this.canAccessRoles() || this.canAccessReports() || this.canAccessConfig() || this.canAccessTecnicosApproval()
   );
+
+  // Acceso al módulo Encuentros
+  readonly canAccessEncuentrosMenu = computed(() => this.isSuperAdmin() || this.userRoles().includes('ROLE_ADMIN') || this.isTecnico());
+  readonly canAccessReservas = computed(() => this.canAccessEncuentrosMenu());
+  readonly canAccessJugadores = computed(() => this.canAccessEncuentrosMenu());
+  readonly canAccessEventos = computed(() => this.canAccessEncuentrosMenu());
 
   readonly hasNoMenuAccess = computed(() => 
     !this.canAccessDashboard() && 
@@ -51,7 +57,8 @@ export class AuthService {
     !this.canAccessUsers() && 
     !this.canAccessRoles() && 
     !this.canAccessReports() && 
-    !this.canAccessConfig()
+    !this.canAccessConfig() &&
+    !this.canAccessEncuentrosMenu()
   );
 
   constructor() {
@@ -95,55 +102,85 @@ export class AuthService {
   }
 
   // Switch de rol interactivo para demostración y verificación inmediata
-  switchActiveRoleForDemo(role: 'SUPER_ADMIN' | 'ADMIN' | 'USER' | 'STANDARD'): void {
-    let roles: string[] = [];
-    let name = 'Super Administrador';
+  switchActiveRoleForDemo(role: 'SUPER_ADMIN' | 'ADMIN' | 'TECNICO_ACTIVO' | 'TECNICO_PENDIENTE' | 'USER' | 'STANDARD'): void {
     let email = 'admin@empresa.com';
+    let password = 'Admin$Tr0ng_2026!';
 
     switch (role) {
       case 'SUPER_ADMIN':
-        roles = ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'];
-        name = 'Super Administrador';
         email = 'admin@empresa.com';
+        password = 'Admin$Tr0ng_2026!';
         break;
       case 'ADMIN':
-        roles = ['ROLE_ADMIN'];
-        name = 'Juan Pérez (Administrador)';
-        email = 'juan@empresa.com';
+        email = 'admin@demo.pe';
+        password = 'Admin$Demo_2026!';
+        break;
+      case 'TECNICO_ACTIVO':
+        email = 'tecnico1@demo.pe';
+        password = 'Tecnico1$Pass_2026!';
+        break;
+      case 'TECNICO_PENDIENTE':
+        email = 'tecnico2@demo.pe';
+        password = 'Tecnico2$Pass_2026!';
         break;
       case 'USER':
-        roles = ['ROLE_USER'];
-        name = 'Carlos Ruiz (Usuario)';
         email = 'usuario@empresa.com';
+        password = 'User$Pass_2026!';
         break;
       case 'STANDARD':
-        roles = ['ROLE_STANDARD'];
-        name = 'Usuario Estándar';
         email = 'estandar@empresa.com';
+        password = 'Estandar$Pass_2026!';
         break;
     }
 
-    const updatedUser: UserSummary = {
-      id: 'demo-' + role.toLowerCase(),
-      email,
-      fullName: name,
-      roles,
-      permissions: role === 'SUPER_ADMIN' ? ['USER_READ', 'USER_WRITE', 'ROLE_MANAGE', 'CONFIG_MANAGE', 'AUDIT_VIEW'] : []
-    };
+    this.login({ email, password }).subscribe({
+      next: () => {
+        if (this.canAccessDashboard()) {
+          this.router.navigate(['/dashboard']);
+        } else if (this.isTecnico()) {
+          this.router.navigate(['/encuentros/reservas']);
+        } else if (this.canAccessProfile()) {
+          this.router.navigate(['/perfil']);
+        } else {
+          this.router.navigate(['/sin-acceso']);
+        }
+      },
+      error: () => {
+        // Fallback local en caso de desconexión
+        let roles: string[] = [];
+        let name = 'Super Administrador';
+        let estadoAprobacion: 'PENDIENTE' | 'ACTIVO' | 'RECHAZADO' | 'SUSPENDIDO' = 'ACTIVO';
 
-    this.currentUser.set(updatedUser);
-    try {
-      localStorage.setItem('futbol_user', JSON.stringify(updatedUser));
-    } catch {}
+        if (role === 'SUPER_ADMIN') { roles = ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']; name = 'Super Administrador'; }
+        else if (role === 'ADMIN') { roles = ['ROLE_ADMIN']; name = 'Juan Pérez (Administrador)'; }
+        else if (role === 'TECNICO_ACTIVO') { roles = ['ROLE_TECNICO']; name = 'Roberto Carlos (Técnico Activo)'; }
+        else if (role === 'TECNICO_PENDIENTE') { roles = ['ROLE_TECNICO']; name = 'Zinedine Zidane (Técnico Pendiente)'; estadoAprobacion = 'PENDIENTE'; }
+        else if (role === 'USER') { roles = ['ROLE_USER']; name = 'Carlos Ruiz (Usuario)'; }
+        else if (role === 'STANDARD') { roles = ['ROLE_STANDARD']; name = 'Usuario Estándar'; }
 
-    // Redirección adaptativa según permisos
-    if (this.canAccessDashboard()) {
-      this.router.navigate(['/dashboard']);
-    } else if (this.canAccessProfile()) {
-      this.router.navigate(['/perfil']);
-    } else {
-      this.router.navigate(['/sin-acceso']);
-    }
+        const updatedUser: UserSummary = {
+          id: 'demo-' + role.toLowerCase(),
+          email,
+          fullName: name,
+          telefono: '987654321',
+          estadoAprobacion,
+          roles,
+          permissions: role === 'SUPER_ADMIN' ? ['USER_READ', 'USER_WRITE', 'ROLE_MANAGE', 'CONFIG_MANAGE', 'AUDIT_VIEW'] : []
+        };
+        this.currentUser.set(updatedUser);
+        try { localStorage.setItem('futbol_user', JSON.stringify(updatedUser)); } catch {}
+
+        if (this.canAccessDashboard()) {
+          this.router.navigate(['/dashboard']);
+        } else if (this.isTecnico()) {
+          this.router.navigate(['/encuentros/reservas']);
+        } else if (this.canAccessProfile()) {
+          this.router.navigate(['/perfil']);
+        } else {
+          this.router.navigate(['/sin-acceso']);
+        }
+      }
+    });
   }
 
   register(data: { fullName: string; email: string; password: string }): Observable<MessageResponse> {

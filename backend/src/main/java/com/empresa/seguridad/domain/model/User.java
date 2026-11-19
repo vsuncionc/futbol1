@@ -34,6 +34,23 @@ public class User {
     @Column(name = "full_name", nullable = false, length = 120)
     private String fullName;
 
+    @Column(name = "telefono", length = 30)
+    private String telefono;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_aprobacion", nullable = false, length = 20)
+    private EstadoAprobacion estadoAprobacion = EstadoAprobacion.ACTIVO;
+
+    @Column(name = "motivo_rechazo", length = 500)
+    private String motivoRechazo;
+
+    @Column(name = "aprobado_por")
+    private UUID aprobadoPor;
+
+    @Column(name = "fecha_decision")
+    private LocalDateTime fechaDecision;
+
     @Builder.Default
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;

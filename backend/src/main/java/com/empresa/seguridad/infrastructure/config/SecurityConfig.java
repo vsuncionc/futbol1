@@ -73,14 +73,17 @@ public class SecurityConfig {
                         // Consola H2 para desarrollo y pruebas
                         .requestMatchers("/h2-console/**").permitAll()
 
-                        // Endpoints públicos de autenticación
+                        // Endpoints públicos de autenticación y módulo público de encuentros
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/registro-tecnico").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh-token").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/forgot-password").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/reset-password").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/registration-status").permitAll()
+                        .requestMatchers("/api/v1/publico/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/canchas/**").permitAll()
 
                         // Endpoints administrativos protegidos por rol o autoridad
                         .requestMatchers("/api/v1/admin/**").hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMIN")
