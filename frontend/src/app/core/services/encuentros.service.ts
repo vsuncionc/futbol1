@@ -33,6 +33,12 @@ export class EncuentrosService {
    * Se ejecuta automáticamente tras cualquier aprobación, rechazo o cancelación.
    */
   actualizarConteosMenu(): void {
+    if (!this.authService.isAuthenticated()) {
+      this.conteoReservasPendientes.set(0);
+      this.conteoTecnicosPendientes.set(0);
+      return;
+    }
+
     if (this.authService.canAccessDashboard()) {
       this.getSolicitudesPendientes().subscribe({
         next: (solicitudes) => {

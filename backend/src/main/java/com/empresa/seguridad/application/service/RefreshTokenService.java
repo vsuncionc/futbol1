@@ -57,8 +57,15 @@ public class RefreshTokenService {
         RefreshToken oldRefreshToken = refreshTokenRepository.findByTokenHash(oldHash)
                 .orElseThrow(() -> new IllegalArgumentException("Sesión no válida o expirada"));
 
-        // Detección de robo de token: Si ya fue reemplazado y se vuelve a presentar, revocar todo
+        // Detección de reutilización / robo de token con ventana de gracia para SPAs concurrentes
         if (oldRefreshToken.getReplacedAt() != null || oldRefreshToken.isRevoked()) {
+            if (oldRefreshToken.getReplacedAt() != null &&
+                    java.time.Duration.between(oldRefreshToken.getReplacedAt(), Instant.now()).getSeconds() < 30) {
+                log.info("Refresco concurrente de token dentro de la ventana de gracia (30s) para usuario: {}",
+                        oldRefreshToken.getUser().getEmail());
+                return oldRefreshToken;
+            }
+
             log.warn("ALERTA DE SEGURIDAD: Detección de reutilización de refresh token para usuario: {}. Revocando todas las sesiones.",
                     oldRefreshToken.getUser().getEmail());
             refreshTokenRepository.revokeAllUserTokens(oldRefreshToken.getUser());

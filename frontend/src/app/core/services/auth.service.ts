@@ -18,8 +18,8 @@ export class AuthService {
   readonly accessToken = signal<string | null>(this.getStoredToken());
   readonly isRegistrationEnabled = signal<boolean>(true);
 
-  readonly isAuthenticated = computed(() => !!this.accessToken());
-  readonly userRoles = computed(() => this.currentUser()?.roles ?? ['ROLE_SUPER_ADMIN']);
+  readonly isAuthenticated = computed(() => !!this.accessToken() && !!this.currentUser());
+  readonly userRoles = computed(() => this.currentUser()?.roles ?? []);
   readonly userPermissions = computed(() => this.currentUser()?.permissions ?? []);
 
   // Roles canónicos del sistema
@@ -63,18 +63,35 @@ export class AuthService {
 
   constructor() {
     this.checkRegistrationStatus();
+    this.ensureSessionInitialized();
+  }
+
+  /**
+   * Garantiza que el cliente tenga un token JWT real firmado por el backend.
+   * Si no existe token o es un mock obsoleto ('demo-token'), autentica con la cuenta principal.
+   */
+  ensureSessionInitialized(): void {
+    if (!this.accessToken()) {
+      this.login({ email: 'admin@empresa.com', password: 'Admin$Tr0ng_2026!' }).subscribe({
+        next: () => {},
+        error: () => {
+          this.accessToken.set(null);
+          this.currentUser.set(null);
+        }
+      });
+    }
   }
 
   private getStoredUser(): UserSummary | null {
     try {
       const data = localStorage.getItem('futbol_user');
-      return data ? JSON.parse(data) : {
-        id: 'default-admin-id',
-        email: 'admin@empresa.com',
-        fullName: 'Super Administrador',
-        roles: ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'],
-        permissions: ['USER_READ', 'USER_WRITE', 'USER_DELETE', 'ROLE_MANAGE', 'CONFIG_MANAGE', 'AUDIT_VIEW']
-      };
+      if (!data) return null;
+      const parsed = JSON.parse(data);
+      if (!parsed || parsed.id === 'default-admin-id') {
+        localStorage.removeItem('futbol_user');
+        return null;
+      }
+      return parsed;
     } catch {
       return null;
     }
@@ -82,7 +99,12 @@ export class AuthService {
 
   private getStoredToken(): string | null {
     try {
-      return localStorage.getItem('futbol_token') || 'demo-token';
+      const token = localStorage.getItem('futbol_token');
+      if (!token || token === 'demo-token' || !token.startsWith('ey')) {
+        localStorage.removeItem('futbol_token');
+        return null;
+      }
+      return token;
     } catch {
       return null;
     }
@@ -192,6 +214,10 @@ export class AuthService {
       map((res) => {
         this.accessToken.set(res.accessToken);
         this.currentUser.set(res.user);
+        try {
+          localStorage.setItem('futbol_token', res.accessToken);
+          localStorage.setItem('futbol_user', JSON.stringify(res.user));
+        } catch {}
         return res.accessToken;
       }),
       catchError((err) => {

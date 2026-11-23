@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -42,7 +42,11 @@ interface MiniDia {
       <!-- 1. TOPBAR GOOGLE CALENDAR STYLE -->
       <header class="cal-topbar">
         <div class="topbar-left">
-          <div class="logo-group">
+          <div class="logo-group clickable" 
+               (click)="toggleSidebarLateral()" 
+               matTooltip="Clic para mostrar u ocultar el panel lateral" 
+               role="button" 
+               tabindex="0">
             <div class="cal-icon-badge">
               <mat-icon>calendar_today</mat-icon>
             </div>
@@ -83,7 +87,7 @@ interface MiniDia {
       <!-- 2. CUERPO PRINCIPAL (SIDEBAR IZQUIERDA + GRILLA SEMANAL) -->
       <div class="cal-main-area">
         <!-- SIDEBAR IZQUIERDO -->
-        <aside class="cal-sidebar">
+        <aside class="cal-sidebar" [class.collapsed]="!mostrarSidebarLateral()">
           <!-- BOTÓN CREAR FLOTANTE ESTILO GOOGLE CALENDAR -->
           <button 
             type="button" 
@@ -455,6 +459,27 @@ interface MiniDia {
       gap: 0.6rem;
     }
 
+    .logo-group.clickable {
+      cursor: pointer;
+      user-select: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #f1f5f9;
+
+        .cal-icon-badge {
+          transform: scale(1.06);
+          box-shadow: 0 4px 10px rgba(0, 102, 255, 0.3);
+        }
+      }
+
+      &:active {
+        transform: scale(0.98);
+      }
+    }
+
     .cal-icon-badge {
       width: 36px;
       height: 36px;
@@ -464,6 +489,8 @@ interface MiniDia {
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      flex-shrink: 0;
     }
 
     .cal-icon-badge mat-icon {
@@ -581,6 +608,7 @@ interface MiniDia {
       display: flex;
       flex: 1;
       overflow: hidden;
+      position: relative;
     }
 
     /* SIDEBAR */
@@ -594,6 +622,11 @@ interface MiniDia {
       flex-direction: column;
       gap: 1.25rem;
       overflow-y: auto;
+      transition: all 0.2s ease;
+
+      &.collapsed {
+        display: none !important;
+      }
     }
 
     /* BOTÓN GOOGLE CREATE */
@@ -1364,6 +1397,13 @@ export class ReservasCalendarioComponent implements OnInit {
   public authService = inject(AuthService);
   private fb = inject(FormBuilder);
 
+  // Control de visibilidad del panel lateral (Nueva Reserva, Mini Calendario, Filtros)
+  readonly mostrarSidebarLateral = signal<boolean>(true);
+
+  toggleSidebarLateral(): void {
+    this.mostrarSidebarLateral.update(v => !v);
+  }
+
   // Fecha pivote para la navegación (inicia en hoy)
   fechaPivote = signal<Date>(new Date());
   fechaMiniPivote = signal<Date>(new Date());
@@ -1552,12 +1592,24 @@ export class ReservasCalendarioComponent implements OnInit {
     return cancha.tarifaHora * this.duracionHorasCalculada();
   });
 
+  constructor() {
+    effect(() => {
+      if (this.authService.isAuthenticated()) {
+        this.cargarCanchas();
+        this.cargarReservas();
+      }
+    });
+  }
+
   ngOnInit(): void {
-    this.cargarCanchas();
-    this.cargarReservas();
+    if (this.authService.isAuthenticated()) {
+      this.cargarCanchas();
+      this.cargarReservas();
+    }
   }
 
   cargarCanchas(): void {
+    if (!this.authService.isAuthenticated()) return;
     this.encuentrosService.getCanchas().subscribe({
       next: (data) => {
         this.canchas.set(data);
@@ -1573,6 +1625,7 @@ export class ReservasCalendarioComponent implements OnInit {
   }
 
   cargarReservas(): void {
+    if (!this.authService.isAuthenticated()) return;
     this.cargando.set(true);
     this.encuentrosService.getCalendario().subscribe({
       next: (data) => {

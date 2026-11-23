@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, HostListener, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet, NavigationEnd } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -341,6 +341,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private navSub?: Subscription;
   private intervalId?: any;
 
+  constructor() {
+    effect(() => {
+      if (this.authService.isAuthenticated()) {
+        this.cargarConteos();
+      }
+    });
+  }
+
   ngOnInit(): void {
     // Restaurar preferencia guardada en Desktop
     if (typeof localStorage !== 'undefined') {
@@ -350,13 +358,17 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       }
     }
 
-    this.cargarConteos();
+    if (this.authService.isAuthenticated()) {
+      this.cargarConteos();
+    }
 
     // Actualizar conteos cada vez que el usuario navega entre pantallas
     this.navSub = this.router.events.pipe(
       filter(event => event instanceof NavigationEnd)
     ).subscribe(() => {
-      this.cargarConteos();
+      if (this.authService.isAuthenticated()) {
+        this.cargarConteos();
+      }
       // En móvil cerrar el menú desplegado al cambiar de ruta
       if (this.isMobileView()) {
         this.isMobileOpen.set(false);
@@ -365,7 +377,9 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
     // Sondeo de respaldo periódico cada 15 segundos
     this.intervalId = setInterval(() => {
-      this.cargarConteos();
+      if (this.authService.isAuthenticated()) {
+        this.cargarConteos();
+      }
     }, 15000);
   }
 
