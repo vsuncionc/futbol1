@@ -37,6 +37,9 @@ public class User {
     @Column(name = "telefono", length = 30)
     private String telefono;
 
+    @Column(name = "avatar_url", length = 1000)
+    private String avatarUrl;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_aprobacion", nullable = false, length = 20)

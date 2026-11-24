@@ -278,7 +278,11 @@ import { EncuentrosService } from '../services/encuentros.service';
             <!-- Perfil del Usuario -->
             <div class="user-pill" [matMenuTriggerFor]="userMenu">
               <div class="avatar-circle">
-                {{ userInitials() }}
+                @if (userAvatarUrl()) {
+                  <img [src]="userAvatarUrl()" alt="Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                } @else {
+                  {{ userInitials() }}
+                }
               </div>
               <span class="user-name">{{ userName() }}</span>
               <mat-icon style="font-size: 18px; width: 18px; height: 18px; color: #64748b;">keyboard_arrow_down</mat-icon>
@@ -462,6 +466,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   userName(): string {
     return this.authService.currentUser()?.fullName || 'Usuario';
+  }
+
+  userAvatarUrl(): string {
+    const url = this.authService.currentUser()?.avatarUrl;
+    return this.authService.getAvatarUrl(url);
   }
 
   userInitials(): string {

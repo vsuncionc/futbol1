@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <!-- INCLUSIÓN DE HOJA DE ESTILOS MODULAR -->
+  <?!= include('Estilos'); ?>
+</head>
+<body>
+  <div class="app-container">
+    <!-- BARRA LATERAL (SIDEBAR) -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-icon">⚽</div>
+        <div class="brand-info">
+          <h2>FUTBOL S.A.</h2>
+          <span>ERP EMPRESARIAL GAS</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item active" onclick="cambiarModulo('FUTBOL_RESERVAS', this)">
+          <span>📅</span> Reservas Canchas
+        </a>
+        <a class="nav-item" onclick="cambiarModulo('FUTBOL_ENCUENTROS', this)">
+          <span>🏆</span> Encuentros y Torneos
+        </a>
+        <a class="nav-item" onclick="cambiarModulo('INVENTARIO', this)">
+          <span>📦</span> Inventario y Stock
+        </a>
+        <a class="nav-item" onclick="cambiarModulo('VENTAS', this)">
+          <span>💳</span> Ventas y Caja
+        </a>
+        <a class="nav-item" onclick="cambiarModulo('LOGISTICA', this)">
+          <span>🚚</span> Logística y Despachos
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="btn-setup-db" onclick="ejecutarInicializacionSheets()" title="Crea y formatea automáticamente las hojas y columnas necesarias en Google Sheets">
+          <span>⚡</span> Inicializar Sheets
+        </button>
+      </div>
+    </aside>
+
+    <!-- ÁREA DE CONTENIDO PRINCIPAL -->
+    <main class="main-content">
+      <!-- CABECERA -->
+      <header class="content-header">
+        <div class="page-title">
+          <h1 id="txtModuloTitulo">Reservas de Canchas Deportivas</h1>
+          <p id="txtModuloDesc">Gestión integral conectada en tiempo real a Google Sheets.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary" onclick="cargarDatosModuloActual()">
+            <span>🔄</span> Refrescar
+          </button>
+          <button class="btn-primary" onclick="abrirModalNuevo()">
+            <span>➕</span> Nuevo Registro
+          </button>
+        </div>
+      </header>
+
+      <!-- TARJETAS DE MÉTRICAS (KPIS CONSOLIDADOS) -->
+      <section class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon">⚽</div>
+          <div class="metric-info">
+            <h3 id="kpiReservas">0</h3>
+            <span>Reservas Activas</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">📦</div>
+          <div class="metric-info">
+            <h3 id="kpiInventario">0</h3>
+            <span>Items en Almacén</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">💰</div>
+          <div class="metric-info">
+            <h3 id="kpiVentas">0</h3>
+            <span>Transacciones Ventas</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">🚚</div>
+          <div class="metric-info">
+            <h3 id="kpiLogistica">0</h3>
+            <span>Guías Despacho</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- TABLA DE DATOS -->
+      <section class="card-table-wrapper">
+        <div class="table-toolbar">
+          <input type="text" id="txtFiltroBusqueda" class="search-input" placeholder="🔍 Buscar en la tabla..." onkeyup="filtrarTabla()">
+          <span id="lblTotalRegistros" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;">Cargando...</span>
+        </div>
+
+        <div class="table-responsive">
+          <table id="tblDatos">
+            <thead>
+              <tr id="tblHeaderRow">
+                <!-- Se inyecta dinámicamente -->
+              </tr>
+            </thead>
+            <tbody id="tblBody">
+              <tr>
+                <td colspan="10" style="text-align: center; padding: 2.5rem; color: var(--text-secondary);">
+                  Cargando información desde Google Sheets...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL DINÁMICO PARA CREAR / EDITAR -->
+  <div class="modal-overlay" id="modalCrud">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modalTitulo">Nuevo Registro</h3>
+        <button class="modal-close" onclick="cerrarModal()">&times;</button>
+      </div>
+      <form id="formRegistro" onsubmit="guardarRegistro(event)">
+        <div class="modal-body" id="modalCamposDinamicos">
+          <!-- Inputs generados según las columnas del módulo activo -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="cerrarModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btnGuardar">Guardar en Sheets</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST DE NOTIFICACIÓN -->
+  <div class="toast" id="toastNotificacion">Mensaje del sistema</div>
+
+  <!-- =========================================================================
+       LÓGICA CLIENTE (JAVASCRIPT ASÍNCRONO CON GOOGLE APPS SCRIPT)
+       ========================================================================= -->
+  <script>
+    // Estado de la aplicación en el navegador
+    let moduloActual = 'FUTBOL_RESERVAS';
+    let columnasActuales = [];
+    let registrosActuales = [];
+    let modoEdicion = false;
+    let idEditando = null;
+
+    // Metadatos de navegación
+    const METADATOS_MODULOS = {
+      FUTBOL_RESERVAS: {
+        titulo: 'Reservas de Canchas Deportivas',
+        desc: 'Monitoreo de solicitudes, horarios y comprobantes de canchas sintéticas F5, F7 y F11.'
+      },
+      FUTBOL_ENCUENTROS: {
+        titulo: 'Cartelera de Encuentros y Torneos',
+        desc: 'Organización de partidos oficiales, cruces de equipos y bolsas informativas.'
+      },
+      INVENTARIO: {
+        titulo: 'Control de Inventario y Almacén',
+        desc: 'Seguimiento de stock de balones, chalecos, redes y productos de cafetería.'
+      },
+      VENTAS: {
+        titulo: 'Registro de Ventas y Comprobantes',
+        desc: 'Control de caja, boletas, facturas y pagos digitales (Yape/Plin/Transferencias).'
+      },
+      LOGISTICA: {
+        titulo: 'Despachos y Guías Logísticas',
+        desc: 'Trazabilidad de traslados de equipamiento y materiales hacia sedes deportivas.'
+      }
+    };
+
+    // Inicialización al cargar la página
+    window.addEventListener('DOMContentLoaded', () => {
+      cargarMetricasGenerales();
+      cargarDatosModuloActual();
+    });
+
+    /**
+     * Promisify para google.script.run
+     */
+    function ejecutarEnServidor(funcionName, payload) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          [funcionName](payload);
+      });
+    }
+
+    /**
+     * Cambio de vista / módulo
+     */
+    function cambiarModulo(nuevoModulo, elementoNav) {
+      moduloActual = nuevoModulo;
+
+      // Actualizar UI activa en sidebar
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      if (elementoNav) elementoNav.classList.add('active');
+
+      // Actualizar Título
+      const meta = METADATOS_MODULOS[nuevoModulo] || { titulo: nuevoModulo, desc: '' };
+      document.getElementById('txtModuloTitulo').innerText = meta.titulo;
+      document.getElementById('txtModuloDesc').innerText = meta.desc;
+
+      // Cargar datos
+      cargarDatosModuloActual();
+    }
+
+    /**
+     * Cargar datos del módulo activo desde Google Sheets
+     */
+    async function cargarDatosModuloActual() {
+      const tbody = document.getElementById('tblBody');
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Consultando Google Sheets...</td></tr>`;
+
+      try {
+        const respuesta = await ejecutarEnServidor('apiDispatcher', {
+          entidad: moduloActual,
+          accion: 'LISTAR'
+        });
+
+        if (!respuesta.success) {
+          throw new Error(respuesta.error);
+        }
+
+        registrosActuales = respuesta.datos || [];
+        renderizarTabla(registrosActuales);
+        cargarMetricasGenerales();
+
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #f87171;">⚠️ ${err.message}<br><button class="btn-setup-db" style="margin: 1rem auto; width: auto;" onclick="ejecutarInicializacionSheets()">Crear Hojas Automáticamente</button></td></tr>`;
+        mostrarToast('Error al cargar datos: ' + err.message, 'error');
+      }
+    }
+
+    /**
+     * Renderizado dinámico de la tabla HTML
+     */
+    function renderizarTabla(datos) {
+      const theadRow = document.getElementById('tblHeaderRow');
+      const tbody = document.getElementById('tblBody');
+      const lblTotal = document.getElementById('lblTotalRegistros');
+
+      theadRow.innerHTML = '';
+      tbody.innerHTML = '';
+
+      if (datos.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No se encontraron registros en esta hoja.</td></tr>`;
+        lblTotal.innerText = '0 registros';
+        return;
+      }
+
+      // Extraer columnas excluyendo columnas internas como _fila
+      const cols = Object.keys(datos[0]).filter(k => k !== '_fila');
+      columnasActuales = cols;
+
+      // 1. Render Encabezados
+      cols.forEach(col => {
+        const th = document.createElement('th');
+        th.innerText = col.replace(/_/g, ' ');
+        theadRow.appendChild(th);
+      });
+      const thAcciones = document.createElement('th');
+      thAcciones.innerText = 'Acciones';
+      theadRow.appendChild(thAcciones);
+
+      // 2. Render Filas
+      datos.forEach(item => {
+        const tr = document.createElement('tr');
+        const idPrincipal = item[cols[0]];
+
+        cols.forEach(col => {
+          const td = document.createElement('td');
+          const val = item[col];
+
+          // Formateo de Badges para estados
+          if (col.toLowerCase().includes('estado')) {
+            td.innerHTML = renderBadgeEstado(val);
+          } else if (col.toLowerCase().includes('soles') || col.toLowerCase().includes('precio') || col.toLowerCase().includes('total')) {
+            td.innerText = `S/ ${Number(val || 0).toFixed(2)}`;
+            td.style.fontWeight = 'bold';
+          } else {
+            td.innerText = val !== undefined && val !== null ? val : '';
+          }
+          tr.appendChild(td);
+        });
+
+        // Columna de Acciones
+        const tdAcciones = document.createElement('td');
+        tdAcciones.innerHTML = `
+          <button class="action-btn" title="Editar" onclick="abrirModalEditar('${idPrincipal}')">✏️</button>
+          <button class="action-btn delete" title="Eliminar" onclick="confirmarEliminar('${idPrincipal}')">🗑️</button>
+        `;
+        tr.appendChild(tdAcciones);
+        tbody.appendChild(tr);
+      });
+
+      lblTotal.innerText = `${datos.length} registro(s) mostrado(s)`;
+    }
+
+    /**
+     * Renderiza Badges con colores semánticos
+     */
+    function renderBadgeEstado(estado) {
+      const e = String(estado || '').toUpperCase();
+      if (e.includes('APROBADA') || e.includes('DISPONIBLE') || e.includes('ENTREGADO')) {
+        return `<span class="badge badge-success">${e}</span>`;
+      } else if (e.includes('PENDIENTE') || e.includes('TRANSITO') || e.includes('EN_CURSO')) {
+        return `<span class="badge badge-warning">${e}</span>`;
+      } else if (e.includes('CRITICO') || e.includes('RECHAZADA') || e.includes('CANCELADO')) {
+        return `<span class="badge badge-danger">${e}</span>`;
+      }
+      return `<span class="badge badge-info">${e || 'N/A'}</span>`;
+    }
+
+    /**
+     * Filtro de búsqueda en tiempo real
+     */
+    function filtrarTabla() {
+      const q = document.getElementById('txtFiltroBusqueda').value.toLowerCase();
+      const filtrados = registrosActuales.filter(item => {
+        return Object.values(item).some(val => String(val).toLowerCase().includes(q));
+      });
+      renderizarTabla(filtrados);
+    }
+
+    /**
+     * Cargar KPIs consolidados
+     */
+    async function cargarMetricasGenerales() {
+      try {
+        const res = await ejecutarEnServidor('apiDispatcher', { accion: 'RESUMEN_METRICAS', entidad: 'FUTBOL_RESERVAS' });
+        if (res.success && res.metricas) {
+          document.getElementById('kpiReservas').innerText = res.metricas.totalReservas;
+          document.getElementById('kpiInventario').innerText = res.metricas.totalInventario;
+          document.getElementById('kpiVentas').innerText = res.metricas.totalVentas;
+          document.getElementById('kpiLogistica').innerText = res.metricas.totalLogistica;
+        }
+      } catch (e) {
+        console.warn('No se pudieron actualizar KPIs:', e);
+      }
+    }
+
+    /**
+     * Ejecuta la creación y formateo automático de Hojas y Columnas en Sheets
+     */
+    async function ejecutarInicializacionSheets() {
+      mostrarToast('Inicializando hojas y columnas en Google Sheets...', 'info');
+      try {
+        const res = await ejecutarEnServidor('inicializarHojasYColumnas');
+        if (res.success) {
+          mostrarToast(res.mensaje, 'success');
+          cargarDatosModuloActual();
+        } else {
+          mostrarToast(res.mensaje, 'error');
+        }
+      } catch (err) {
+        mostrarToast('Error al inicializar: ' + err.message, 'error');
+      }
+    }
+
+    /**
+     * Modal: Abrir para nuevo registro
+     */
+    function abrirModalNuevo() {
+      modoEdicion = false;
+      idEditando = null;
+      document.getElementById('modalTitulo').innerText = `Nuevo Registro en ${moduloActual.replace(/_/g, ' ')}`;
+      generarCamposFormulario({});
+      document.getElementById('modalCrud').classList.add('open');
+    }
+
+    /**
+     * Modal: Abrir para editar
+     */
+    function abrirModalEditar(id) {
+      const item = registrosActuales.find(r => String(r[columnasActuales[0]]) === String(id));
+      if (!item) return;
+
+      modoEdicion = true;
+      idEditando = id;
+      document.getElementById('modalTitulo').innerText = `Editar ${id}`;
+      generarCamposFormulario(item);
+      document.getElementById('modalCrud').classList.add('open');
+    }
+
+    function cerrarModal() {
+      document.getElementById('modalCrud').classList.remove('open');
+    }
+
+    /**
+     * Generador dinámico de campos de formulario según las columnas de la hoja
+     */
+    function generarCamposFormulario(valores) {
+      const contenedor = document.getElementById('modalCamposDinamicos');
+      contenedor.innerHTML = '';
+
+      columnasActuales.forEach((col, idx) => {
+        // La columna ID es autogenerada en modo nuevo
+        if (idx === 0 && !modoEdicion) return;
+
+        const grupo = document.createElement('div');
+        grupo.className = 'form-group';
+
+        const label = document.createElement('label');
+        label.innerText = col.replace(/_/g, ' ');
+
+        const input = document.createElement('input');
+        input.className = 'form-control';
+        input.name = col;
+        input.value = valores[col] !== undefined ? valores[col] : '';
+
+        if (idx === 0 && modoEdicion) {
+          input.readOnly = true;
+          input.style.opacity = '0.6';
+        }
+
+        grupo.appendChild(label);
+        grupo.appendChild(input);
+        contenedor.appendChild(grupo);
+      });
+    }
+
+    /**
+     * Guardar registro (Crear o Actualizar)
+     */
+    async function guardarRegistro(event) {
+      event.preventDefault();
+      const form = document.getElementById('formRegistro');
+      const formData = new FormData(form);
+      const payloadDatos = {};
+
+      formData.forEach((value, key) => {
+        payloadDatos[key] = value;
+      });
+
+      const btn = document.getElementById('btnGuardar');
+      btn.innerText = 'Guardando...';
+      btn.disabled = true;
+
+      try {
+        const accion = modoEdicion ? 'ACTUALIZAR' : 'CREAR';
+        const res = await ejecutarEnServidor('apiDispatcher', {
+          entidad: moduloActual,
+          accion: accion,
+          id: idEditando,
+          datos: payloadDatos
+        });
+
+        if (!res.success) throw new Error(res.error || res.mensaje);
+
+        mostrarToast(res.mensaje, 'success');
+        cerrarModal();
+        cargarDatosModuloActual();
+
+      } catch (err) {
+        mostrarToast('Error al guardar: ' + err.message, 'error');
+      } finally {
+        btn.innerText = 'Guardar en Sheets';
+        btn.disabled = false;
+      }
+    }
+
+    /**
+     * Eliminar registro
+     */
+    async function confirmarEliminar(id) {
+      if (!confirm(`¿Estás seguro de eliminar el registro "${id}" de Google Sheets?`)) return;
+
+      try {
+        const res = await ejecutarEnServidor('apiDispatcher', {
+          entidad: moduloActual,
+          accion: 'ELIMINAR',
+          id: id
+        });
+
+        if (!res.success) throw new Error(res.error || res.mensaje);
+
+        mostrarToast(res.mensaje, 'success');
+        cargarDatosModuloActual();
+
+      } catch (err) {
+        mostrarToast('Error al eliminar: ' + err.message, 'error');
+      }
+    }
+
+    /**
+     * Muestra notificación Toast flotante
+     */
+    function mostrarToast(mensaje, tipo = 'success') {
+      const toast = document.getElementById('toastNotificacion');
+      toast.innerText = mensaje;
+      toast.className = `toast toast-${tipo} show`;
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 4000);
+    }
+  </script>
+</body>
+</html>

@@ -7,10 +7,12 @@ import com.empresa.seguridad.application.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/profile")
@@ -23,6 +25,23 @@ public class UserProfileController {
     public ResponseEntity<UserSummaryDto> getMyProfile(@AuthenticationPrincipal UserDetails userDetails) {
         UserSummaryDto profile = userService.getProfile(userDetails.getUsername());
         return ResponseEntity.ok(profile);
+    }
+
+    @PutMapping(value = "/foto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<UserSummaryDto> uploadProfilePhoto(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam("file") MultipartFile file
+    ) {
+        UserSummaryDto updatedProfile = userService.updateProfilePhoto(userDetails.getUsername(), file);
+        return ResponseEntity.ok(updatedProfile);
+    }
+
+    @DeleteMapping("/foto")
+    public ResponseEntity<UserSummaryDto> deleteProfilePhoto(
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        UserSummaryDto updatedProfile = userService.removeProfilePhoto(userDetails.getUsername());
+        return ResponseEntity.ok(updatedProfile);
     }
 
     @PostMapping("/change-password")

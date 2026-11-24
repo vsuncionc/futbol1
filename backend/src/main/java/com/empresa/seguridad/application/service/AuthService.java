@@ -291,6 +291,7 @@ public class AuthService {
                 user.getFullName(),
                 user.getTelefono(),
                 user.getEstadoAprobacion(),
+                user.getAvatarUrl(),
                 roles,
                 permissions
         );

@@ -14,6 +14,7 @@ com\empresa\seguridad\encuentros\domain\model\Parametro.class
 com\empresa\seguridad\encuentros\application\dto\ReservaDtos$AlertaReservaDto.class
 com\empresa\seguridad\application\dto\UserManagementDtos$CreateRoleRequest.class
 com\empresa\seguridad\application\dto\AuthDtos$RegisterTecnicoRequest.class
+com\empresa\seguridad\encuentros\application\dto\CanchaDtos$UpdateTarifaRequest.class
 com\empresa\seguridad\encuentros\domain\repository\ParametroRepository.class
 com\empresa\seguridad\infrastructure\security\CustomAccessDeniedHandler.class
 com\empresa\seguridad\encuentros\application\dto\ReservaDtos$CancelReservaRequest.class

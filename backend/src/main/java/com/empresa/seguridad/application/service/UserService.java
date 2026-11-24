@@ -7,6 +7,7 @@ import com.empresa.seguridad.application.dto.UserManagementDtos.*;
 import com.empresa.seguridad.domain.model.Role;
 import com.empresa.seguridad.domain.model.SystemConfiguration;
 import com.empresa.seguridad.domain.model.User;
+import com.empresa.seguridad.encuentros.application.service.FileStorageService;
 import com.empresa.seguridad.domain.repository.AuditLogRepository;
 import com.empresa.seguridad.domain.repository.PasswordResetTokenRepository;
 import com.empresa.seguridad.domain.repository.RefreshTokenRepository;
@@ -21,6 +22,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -41,17 +43,26 @@ public class UserService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final AuditLogRepository auditLogRepository;
+    private final FileStorageService fileStorageService;
 
     @Transactional(readOnly = true)
     public UserSummaryDto getProfile(String email) {
         User user = userRepository.findByEmailWithRolesAndPermissions(email.toLowerCase().trim())
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        Set<String> roles = user.getRoles().stream().map(Role::getCode).collect(Collectors.toSet());
-        Set<String> permissions = user.getRoles().stream()
-                .flatMap(r -> r.getPermissions().stream())
-                .map(p -> p.getCode())
-                .collect(Collectors.toSet());
+        return buildUserSummaryDto(user);
+    }
+
+    private UserSummaryDto buildUserSummaryDto(User user) {
+        Set<String> roles = user.getRoles() != null
+                ? user.getRoles().stream().map(Role::getCode).collect(Collectors.toSet())
+                : Collections.emptySet();
+        Set<String> permissions = user.getRoles() != null
+                ? user.getRoles().stream()
+                        .flatMap(r -> r.getPermissions().stream())
+                        .map(p -> p.getCode())
+                        .collect(Collectors.toSet())
+                : Collections.emptySet();
 
         return new UserSummaryDto(
                 user.getId(),
@@ -59,9 +70,34 @@ public class UserService {
                 user.getFullName(),
                 user.getTelefono(),
                 user.getEstadoAprobacion(),
+                user.getAvatarUrl(),
                 roles,
                 permissions
         );
+    }
+
+    @Transactional
+    public UserSummaryDto updateProfilePhoto(String email, MultipartFile file) {
+        User user = userRepository.findByEmailWithRolesAndPermissions(email.toLowerCase().trim())
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        String storedPath = fileStorageService.storeAvatar(file);
+        String avatarUrl = "/api/v1/publico/archivos/" + storedPath;
+        user.setAvatarUrl(avatarUrl);
+        userRepository.save(user);
+
+        return buildUserSummaryDto(user);
+    }
+
+    @Transactional
+    public UserSummaryDto removeProfilePhoto(String email) {
+        User user = userRepository.findByEmailWithRolesAndPermissions(email.toLowerCase().trim())
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        user.setAvatarUrl(null);
+        userRepository.save(user);
+
+        return buildUserSummaryDto(user);
     }
 
     @Transactional

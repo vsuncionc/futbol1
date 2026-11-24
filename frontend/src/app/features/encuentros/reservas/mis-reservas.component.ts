@@ -337,6 +337,7 @@ import { Cancha, Reserva } from '../../../core/models/encuentros.models';
                       <mat-option [value]="h">{{ h }}</mat-option>
                     }
                   </mat-select>
+                  <mat-icon matIconSuffix>schedule</mat-icon>
                 </mat-form-field>
 
                 <mat-form-field appearance="outline" class="form-col">
@@ -346,6 +347,7 @@ import { Cancha, Reserva } from '../../../core/models/encuentros.models';
                       <mat-option [value]="h">{{ h }}</mat-option>
                     }
                   </mat-select>
+                  <mat-icon matIconSuffix>schedule</mat-icon>
                 </mat-form-field>
               </div>
 
@@ -1000,17 +1002,15 @@ export class MisReservasComponent implements OnInit {
   selectedFileName = signal<string | null>(null);
 
   horariosDisponibles: string[] = [
-    '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
-    '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-    '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
-    '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00', '22:30'
+    '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
+    '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
   ];
 
   solicitudForm: FormGroup = this.fb.group({
     canchaId: [null, [Validators.required]],
     fecha: ['', [Validators.required]],
     horaInicio: ['19:00', [Validators.required]],
-    horaFin: ['20:30', [Validators.required]]
+    horaFin: ['20:00', [Validators.required]]
   });
 
   // Conteo reactivo por estado para los chips

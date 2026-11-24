@@ -24,7 +24,7 @@ public class ParametroService {
             Map.entry("EQUIPO_MIN_JUGADORES", new String[]{"4", "Mínimo de jugadores por equipo al publicar"}),
             Map.entry("EQUIPO_MAX_JUGADORES", new String[]{"8", "Máximo de jugadores por equipo"}),
             Map.entry("RESERVA_DURACION_MIN_H", new String[]{"1", "Duración mínima de reserva en horas"}),
-            Map.entry("RESERVA_DURACION_MAX_H", new String[]{"3", "Duración máxima de reserva en horas"}),
+            Map.entry("RESERVA_DURACION_MAX_H", new String[]{"24", "Duración máxima de reserva en horas"}),
             Map.entry("CANCELACION_HORAS_MIN", new String[]{"24", "Horas mínimas de anticipación para cancelación por técnico"}),
             Map.entry("EDICION_HORAS_MIN", new String[]{"2", "Horas antes para editar jugadores de un encuentro publicado"}),
             Map.entry("COMPROBANTE_OBLIGATORIO_TECNICO", new String[]{"false", "Obliga comprobante en solicitud del técnico"}),
@@ -39,13 +39,25 @@ public class ParametroService {
     @Transactional
     public void initDefaultParameters() {
         DEFAULT_PARAMS.forEach((clave, valDesc) -> {
-            if (parametroRepository.findByClave(clave).isEmpty()) {
-                parametroRepository.save(Parametro.builder()
-                        .clave(clave)
-                        .valor(valDesc[0])
-                        .descripcion(valDesc[1])
-                        .build());
-            }
+            parametroRepository.findByClave(clave).ifPresentOrElse(
+                    param -> {
+                        if ("RESERVA_DURACION_MAX_H".equals(clave)) {
+                            try {
+                                if (Integer.parseInt(param.getValor()) < 24) {
+                                    param.setValor("24");
+                                    parametroRepository.save(param);
+                                }
+                            } catch (Exception ignored) {
+                            }
+                        }
+                    },
+                    () -> {
+                        parametroRepository.save(Parametro.builder()
+                                .clave(clave)
+                                .valor(valDesc[0])
+                                .descripcion(valDesc[1])
+                                .build());
+                    });
         });
     }
 

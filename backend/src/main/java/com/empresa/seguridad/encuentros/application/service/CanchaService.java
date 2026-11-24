@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -23,10 +24,28 @@ public class CanchaService {
     }
 
     @Transactional(readOnly = true)
+    public List<CanchaDto> getAll() {
+        return canchaRepository.findAll().stream()
+                .map(this::mapToDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public CanchaDto getById(Long id) {
         Cancha c = canchaRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Cancha no encontrada con id: " + id));
         return mapToDto(c);
+    }
+
+    @Transactional
+    public CanchaDto actualizarTarifa(Long id, BigDecimal nuevaTarifa) {
+        Cancha c = canchaRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Cancha no encontrada con id: " + id));
+        if (nuevaTarifa == null || nuevaTarifa.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("La tarifa por hora debe ser mayor a cero.");
+        }
+        c.setTarifaHora(nuevaTarifa);
+        return mapToDto(canchaRepository.save(c));
     }
 
     public CanchaDto mapToDto(Cancha c) {

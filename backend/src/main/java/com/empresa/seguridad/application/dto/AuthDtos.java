@@ -105,6 +105,7 @@ public class AuthDtos {
             String fullName,
             String telefono,
             com.empresa.seguridad.domain.model.EstadoAprobacion estadoAprobacion,
+            String avatarUrl,
             Set<String> roles,
             Set<String> permissions
     ) {}

@@ -12,6 +12,7 @@ export class AuthService {
   private router = inject(Router);
 
   private readonly API_URL = 'http://localhost:8080/api/v1/auth';
+  private readonly PROFILE_API_URL = 'http://localhost:8080/api/v1/profile';
 
   // Señales reactivas de estado
   readonly currentUser = signal<UserSummary | null>(this.getStoredUser());
@@ -266,5 +267,52 @@ export class AuthService {
   hasPermission(permission: string): boolean {
     const perms = this.userPermissions();
     return perms.includes(permission) || this.hasRole('ROLE_SUPER_ADMIN');
+  }
+
+  getAvatarUrl(url?: string | null): string {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+      return url;
+    }
+    if (url.startsWith('/api/')) {
+      return `http://localhost:8080${url}`;
+    }
+    const cleanPath = url.startsWith('/') ? url.substring(1) : url;
+    return `http://localhost:8080/api/v1/publico/archivos/${cleanPath}`;
+  }
+
+  getProfile(): Observable<UserSummary> {
+    return this.http.get<UserSummary>(`${this.PROFILE_API_URL}/me`).pipe(
+      tap(user => {
+        this.currentUser.set(user);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('futbol_user', JSON.stringify(user));
+        }
+      })
+    );
+  }
+
+  uploadProfilePhoto(file: File): Observable<UserSummary> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.put<UserSummary>(`${this.PROFILE_API_URL}/foto`, formData).pipe(
+      tap(updatedUser => {
+        this.currentUser.set(updatedUser);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('futbol_user', JSON.stringify(updatedUser));
+        }
+      })
+    );
+  }
+
+  removeProfilePhoto(): Observable<UserSummary> {
+    return this.http.delete<UserSummary>(`${this.PROFILE_API_URL}/foto`).pipe(
+      tap(updatedUser => {
+        this.currentUser.set(updatedUser);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('futbol_user', JSON.stringify(updatedUser));
+        }
+      })
+    );
   }
 }

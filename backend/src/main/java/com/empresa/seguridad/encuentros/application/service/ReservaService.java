@@ -471,22 +471,29 @@ public class ReservaService {
             throw new IllegalArgumentException("La hora de fin debe ser posterior a la hora de inicio.");
         }
 
-        // RN-05: Múltiplos de 30 min y duración min/max
-        if (horaInicio.getMinute() % 30 != 0 || horaFin.getMinute() % 30 != 0) {
-            throw new IllegalArgumentException("Los bloques de reserva deben ser en múltiplos de 30 minutos.");
+        // RN-05: Solo horas enteras (minutos en 00) y duración min/max (1h a 24h)
+        boolean esFinDeDia = (horaFin.getHour() == 23 && horaFin.getMinute() == 59);
+        if (horaInicio.getMinute() != 0 || (horaFin.getMinute() != 0 && !esFinDeDia)) {
+            throw new IllegalArgumentException("Las reservas solo se permiten en horas enteras (ej. 08:00, 09:00).");
         }
 
         long minutos = Duration.between(horaInicio, horaFin).toMinutes();
+        if (esFinDeDia) {
+            minutos += 1; // 23:59 cuenta como 24:00 (hora completa)
+        }
         int minHoras = parametroService.getInt("RESERVA_DURACION_MIN_H", 1);
-        int maxHoras = parametroService.getInt("RESERVA_DURACION_MAX_H", 3);
+        int maxHoras = parametroService.getInt("RESERVA_DURACION_MAX_H", 24);
 
-        if (minutos < (minHoras * 60) || minutos > (maxHoras * 60)) {
-            throw new IllegalArgumentException("La duración debe ser entre " + minHoras + " y " + maxHoras + " horas.");
+        if (minutos < (minHoras * 60) || minutos > (maxHoras * 60) || minutos % 60 != 0) {
+            throw new IllegalArgumentException("La duración debe ser de horas enteras entre " + minHoras + " y " + maxHoras + " horas.");
         }
     }
 
     private BigDecimal calcularHoras(LocalTime inicio, LocalTime fin) {
         long minutos = Duration.between(inicio, fin).toMinutes();
+        if (fin.getHour() == 23 && fin.getMinute() == 59) {
+            minutos += 1;
+        }
         return BigDecimal.valueOf(minutos).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
     }
 

@@ -305,20 +305,43 @@ interface MiniDia {
 
                 <div class="form-group">
                   <label class="form-label">Hora Inicio <span class="req">*</span></label>
-                  <select formControlName="horaInicio" class="form-control" (change)="onHoraInicioCambio()">
-                    @for (h of opcionesHorasInicio; track h) {
-                      <option [value]="h">{{ h }}</option>
-                    }
-                  </select>
+                  <div class="timepicker-wrapper">
+                    <select 
+                      formControlName="horaInicio" 
+                      class="form-control timepicker-select" 
+                      (change)="onHoraInicioCambio()">
+                      @for (h of opcionesHorasInicio; track h) {
+                        <option [value]="h">{{ h }}</option>
+                      }
+                    </select>
+                    <mat-icon class="select-clock-icon">schedule</mat-icon>
+                  </div>
                 </div>
 
                 <div class="form-group">
                   <label class="form-label">Hora Fin <span class="req">*</span></label>
-                  <select formControlName="horaFin" class="form-control" (change)="onDatosReservaCambiaron()">
-                    @for (h of opcionesHorasFin(); track h) {
-                      <option [value]="h">{{ h }}</option>
-                    }
-                  </select>
+                  <div class="timepicker-wrapper">
+                    <select 
+                      formControlName="horaFin" 
+                      class="form-control timepicker-select" 
+                      (change)="onDatosReservaCambiaron()">
+                      @for (opt of opcionesHorasFin(); track opt.valor) {
+                        <option [value]="opt.valor">{{ opt.label }}</option>
+                      }
+                    </select>
+                    <mat-icon class="select-clock-icon">schedule</mat-icon>
+                  </div>
+                </div>
+              </div>
+
+              <!-- BOTONES DE DURACIÓN RÁPIDA (SOLO HORAS ENTERAS) -->
+              <div class="quick-duration-bar">
+                <span class="quick-duration-label">Duración rápida:</span>
+                <div class="quick-duration-btns">
+                  <button type="button" class="btn-duration-chip" [class.active]="duracionHorasCalculada() === 1" (click)="setDuracionRapida(1)">1 hora</button>
+                  <button type="button" class="btn-duration-chip" [class.active]="duracionHorasCalculada() === 2" (click)="setDuracionRapida(2)">2 horas</button>
+                  <button type="button" class="btn-duration-chip" [class.active]="duracionHorasCalculada() === 3" (click)="setDuracionRapida(3)">3 horas</button>
+                  <button type="button" class="btn-duration-chip" [class.active]="duracionHorasCalculada() === 4" (click)="setDuracionRapida(4)">4 horas</button>
                 </div>
               </div>
 
@@ -344,7 +367,7 @@ interface MiniDia {
                     <div>
                       <strong>Duración No Permitida</strong>
                       <p>{{ duracionInvalida() }}</p>
-                      <span class="alert-hint">Las reservas deben ser de entre 1 y 3 horas en bloques de 30 min.</span>
+                      <span class="alert-hint">Las reservas se realizan exclusivamente por horas enteras (1, 2 o 3 horas).</span>
                     </div>
                   </div>
                 } @else if (conflictoConfirmado()) {
@@ -1204,6 +1227,85 @@ interface MiniDia {
       gap: 0.75rem;
     }
 
+    .timepicker-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+
+    .timepicker-select {
+      width: 100%;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      padding-right: 2.2rem;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background: #ffffff;
+    }
+
+    .select-clock-icon {
+      position: absolute;
+      right: 0.75rem;
+      pointer-events: none;
+      font-size: 1.15rem;
+      width: 1.15rem;
+      height: 1.15rem;
+      color: #0066ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .quick-duration-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+      margin-bottom: 0.25rem;
+      padding: 0.45rem 0.75rem;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 6px;
+    }
+
+    .quick-duration-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #64748b;
+    }
+
+    .quick-duration-btns {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-duration-chip {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #0066ff;
+      padding: 0.2rem 0.55rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-duration-chip:hover {
+      background: #eff6ff;
+      border-color: #0066ff;
+    }
+
+    .btn-duration-chip.active {
+      background: #0066ff;
+      color: #ffffff;
+      border-color: #0066ff;
+    }
+
     /* VERIFICATION BANNER */
     .verification-area {
       margin: 0.25rem 0;
@@ -1436,32 +1538,38 @@ export class ReservasCalendarioComponent implements OnInit {
     { valor: 23, label: '11 PM' }
   ];
 
-  // Opciones de selector de horas (en bloques de 30 min)
+  // Opciones de selector de horas (exclusivamente horas enteras: 07:00 a 23:00)
   opcionesHorasInicio = [
-    '07:00', '07:30', '08:00', '08:30', '09:00', '09:30',
-    '10:00', '10:30', '11:00', '11:30', '12:00', '12:30',
-    '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
-    '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
-    '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00'
+    '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
+    '19:00', '20:00', '21:00', '22:00', '23:00'
   ];
 
   fechaMinimaStr = this.formatDateIso(new Date());
 
-  // Opciones dinámicas de hora fin según la hora de inicio seleccionada (1h a 3h en pasos de 30m)
+  // Señales reactivas para el formulario de reserva
+  horaInicioActual = signal<string>('19:00');
+  horaFinActual = signal<string>('20:00');
+  canchaIdActual = signal<number | null>(null);
+
+  // Opciones dinámicas de hora fin según la hora de inicio seleccionada:
+  // Muestra todas las horas consecutivas hasta las 24 horas (medianoche)
   opcionesHorasFin = computed(() => {
-    const ini = this.reservaForm?.get('horaInicio')?.value || '19:00';
+    const ini = this.horaInicioActual() || '19:00';
     const parts = ini.split(':');
-    const iniMins = (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
-    const validEnds: string[] = [];
-    for (let dur = 60; dur <= 180; dur += 30) {
-      const endMins = iniMins + dur;
-      if (endMins <= 23 * 60 + 30) {
-        const h = Math.floor(endMins / 60);
-        const m = endMins % 60;
-        validEnds.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-      }
+    const iniHour = parseInt(parts[0], 10) || 7;
+    const validEnds: { valor: string; label: string }[] = [];
+    for (let endHour = iniHour + 1; endHour <= 24; endHour++) {
+      const dur = endHour - iniHour;
+      const durLabel = dur === 1 ? '1 hora' : `${dur} horas`;
+      const displayHour = endHour === 24 ? '24:00' : `${endHour.toString().padStart(2, '0')}:00`;
+      const val = endHour === 24 ? '23:59' : `${endHour.toString().padStart(2, '0')}:00`;
+      validEnds.push({
+        valor: val,
+        label: `${displayHour} (${durLabel})`
+      });
     }
-    return validEnds.length > 0 ? validEnds : ['20:30', '21:00', '21:30', '22:00'];
+    return validEnds;
   });
 
   // Modal State
@@ -1479,7 +1587,7 @@ export class ReservasCalendarioComponent implements OnInit {
     canchaId: [null, Validators.required],
     fecha: [this.fechaMinimaStr, Validators.required],
     horaInicio: ['19:00', Validators.required],
-    horaFin: ['20:30', Validators.required]
+    horaFin: ['20:00', Validators.required]
   });
 
   // Cálculo de los 7 días de la semana visible
@@ -1572,20 +1680,25 @@ export class ReservasCalendarioComponent implements OnInit {
   });
 
   canchaSeleccionadaValida = computed(() => {
-    const cId = this.reservaForm.get('canchaId')?.value;
+    const cId = this.canchaIdActual();
     return cId !== null && cId !== undefined;
   });
 
   duracionHorasCalculada = computed(() => {
-    const ini = this.reservaForm.get('horaInicio')?.value;
-    const fin = this.reservaForm.get('horaFin')?.value;
-    if (!ini || !fin) return 1.5;
-    const durMins = this.timeToMinutes(fin) - this.timeToMinutes(ini);
-    return Math.max(0, Math.round((durMins / 60) * 10) / 10);
+    const ini = this.horaInicioActual();
+    const fin = this.horaFinActual();
+    if (!ini || !fin) return 1;
+    let finMins = this.timeToMinutes(fin);
+    if (fin === '23:59' || fin === '24:00') {
+      finMins = 24 * 60;
+    }
+    const iniMins = this.timeToMinutes(ini);
+    const durMins = finMins - iniMins;
+    return Math.max(0, Math.round(durMins / 60));
   });
 
   montoEstimado = computed(() => {
-    const cId = this.reservaForm.get('canchaId')?.value;
+    const cId = this.canchaIdActual();
     if (!cId) return 0;
     const cancha = this.canchas().find(c => c.id === cId);
     if (!cancha) return 0;
@@ -1593,6 +1706,18 @@ export class ReservasCalendarioComponent implements OnInit {
   });
 
   constructor() {
+    this.reservaForm.valueChanges.subscribe(val => {
+      if (val.horaInicio && val.horaInicio !== this.horaInicioActual()) {
+        this.horaInicioActual.set(val.horaInicio);
+      }
+      if (val.horaFin && val.horaFin !== this.horaFinActual()) {
+        this.horaFinActual.set(val.horaFin);
+      }
+      if (val.canchaId !== undefined && val.canchaId !== this.canchaIdActual()) {
+        this.canchaIdActual.set(val.canchaId);
+      }
+    });
+
     effect(() => {
       if (this.authService.isAuthenticated()) {
         this.cargarCanchas();
@@ -1737,6 +1862,8 @@ export class ReservasCalendarioComponent implements OnInit {
   }
 
   formatHora12(hora24: string): string {
+    if (!hora24) return '';
+    if (hora24 === '24:00' || hora24 === '23:59') return '12:00 am';
     const parts = hora24.split(':');
     let h = parseInt(parts[0], 10);
     const m = parts[1];
@@ -1770,7 +1897,7 @@ export class ReservasCalendarioComponent implements OnInit {
     const horaClamped = Math.min(Math.max(horaCalculada, 7), 21);
 
     const horaIni = `${horaClamped.toString().padStart(2, '0')}:00`;
-    const horaFin = `${(horaClamped + 1).toString().padStart(2, '0')}:30`;
+    const horaFin = `${(horaClamped + 1).toString().padStart(2, '0')}:00`;
 
     this.abrirModalNuevaReserva(fechaStr, horaIni, horaFin);
   }
@@ -1847,15 +1974,17 @@ export class ReservasCalendarioComponent implements OnInit {
       }
     }
 
-    // Calcular horaFin inicial (+1.5h)
+    // Calcular horaFin inicial (+1h entera como continuidad directa)
     let hFin = horaFinDefault;
     if (!hFin) {
-      const iniMins = this.timeToMinutes(hIni);
-      const finMins = iniMins + 90;
-      const h = Math.floor(finMins / 60);
-      const m = finMins % 60;
-      hFin = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+      const iniHour = parseInt(hIni.split(':')[0], 10) || 7;
+      const finHour = Math.min(iniHour + 1, 23);
+      hFin = `${finHour.toString().padStart(2, '0')}:00`;
     }
+
+    this.horaInicioActual.set(hIni);
+    this.horaFinActual.set(hFin);
+    this.canchaIdActual.set(canchaIdInicial);
 
     this.reservaForm.reset({
       canchaId: canchaIdInicial,
@@ -1886,21 +2015,43 @@ export class ReservasCalendarioComponent implements OnInit {
   onHoraInicioCambio(): void {
     const ini = this.reservaForm.get('horaInicio')?.value;
     if (ini) {
+      this.horaInicioActual.set(ini);
+
+      const iniHour = parseInt(ini.split(':')[0], 10) || 7;
       const validEnds = this.opcionesHorasFin();
       const currentFin = this.reservaForm.get('horaFin')?.value;
-      if (!validEnds.includes(currentFin)) {
-        const nuevoFin = validEnds.length > 1 ? validEnds[1] : (validEnds[0] || '20:30');
-        this.reservaForm.patchValue({ horaFin: nuevoFin }, { emitEvent: false });
+
+      // Si la hora de fin actual no es posterior o no pertenece a las opciones válidas, ajustar a la primera hora consecutiva (+1h)
+      const esFinValido = validEnds.some(opt => opt.valor === currentFin);
+      if (!esFinValido) {
+        const nuevoFin = validEnds.length > 0 ? validEnds[0].valor : `${Math.min(iniHour + 1, 24).toString().padStart(2, '0')}:00`;
+        this.reservaForm.patchValue({ horaFin: nuevoFin });
+        this.horaFinActual.set(nuevoFin);
       }
     }
     this.verificarDisponibilidadPrevia();
   }
 
-  onDatosReservaCambiaron(): void {
+  setDuracionRapida(horas: number): void {
+    const ini = this.reservaForm.get('horaInicio')?.value || this.horaInicioActual();
+    if (!ini) return;
+    const iniHour = parseInt(ini.split(':')[0], 10) || 7;
+    const finHour = Math.min(iniHour + horas, 24);
+    const finStr = finHour === 24 ? '23:59' : `${finHour.toString().padStart(2, '0')}:00`;
+    this.reservaForm.patchValue({ horaFin: finStr });
+    this.horaFinActual.set(finStr);
     this.verificarDisponibilidadPrevia();
   }
 
-  // VERIFICACIÓN PREVIA: Verifica horario pasado, duración (1h a 3h) y cruce con reservas confirmadas (APROBADA)
+  onDatosReservaCambiaron(): void {
+    const fin = this.reservaForm.get('horaFin')?.value;
+    if (fin) this.horaFinActual.set(fin);
+    const cId = this.reservaForm.get('canchaId')?.value;
+    if (cId !== undefined) this.canchaIdActual.set(cId);
+    this.verificarDisponibilidadPrevia();
+  }
+
+  // VERIFICACIÓN PREVIA: Verifica horario pasado, duración en horas enteras y cruce con reservas confirmadas (APROBADA)
   verificarDisponibilidadPrevia(): void {
     const cId = this.reservaForm.get('canchaId')?.value;
     const fecha = this.reservaForm.get('fecha')?.value;
@@ -1915,7 +2066,10 @@ export class ReservasCalendarioComponent implements OnInit {
     }
 
     const iniMins = this.timeToMinutes(hIni);
-    const finMins = this.timeToMinutes(hFin);
+    let finMins = this.timeToMinutes(hFin);
+    if (hFin === '23:59' || hFin === '24:00') {
+      finMins = 24 * 60;
+    }
 
     // 1. Validar fecha y hora en el pasado
     const now = new Date();
@@ -1931,15 +2085,24 @@ export class ReservasCalendarioComponent implements OnInit {
       this.esFechaHoraPasada.set(false);
     }
 
-    // 2. Validar duración entre 1h (60 min) y 3h (180 min)
+    // 2. Validar duración exclusivamente en horas enteras
     const durMins = finMins - iniMins;
-    if (durMins < 60 || durMins > 180) {
+    const minutosIni = iniMins % 60;
+    const minutosFin = finMins % 60;
+
+    if (minutosIni !== 0 || minutosFin !== 0) {
+      this.duracionInvalida.set('Las reservas solo se permiten en horas enteras (ej. 08:00 a 09:00).');
+      this.conflictoConfirmado.set(null);
+      return;
+    }
+
+    if (durMins < 60 || durMins > (24 * 60) || durMins % 60 !== 0) {
       this.duracionInvalida.set(
         durMins <= 0
           ? 'La hora de fin debe ser posterior a la hora de inicio.'
           : durMins < 60
-            ? 'La duración mínima de reserva es de 1 hora.'
-            : 'La duración máxima de reserva es de 3 horas.'
+            ? 'La duración mínima de reserva es de 1 hora entera.'
+            : 'La reserva debe ser en horas enteras completas.'
       );
       this.conflictoConfirmado.set(null);
       return;
@@ -1954,7 +2117,7 @@ export class ReservasCalendarioComponent implements OnInit {
       r.canchaId === cId &&
       r.fecha === fecha &&
       r.estado === 'APROBADA' && // VERIFICACIÓN ESTRICTA SOBRE CONFIRMADAS
-      !(finMins <= this.timeToMinutes(r.horaInicio) || iniMins >= this.timeToMinutes(r.horaFin))
+      !(finMins <= this.timeToMinutes(r.horaInicio) || iniMins >= (r.horaFin === '23:59' ? 1440 : this.timeToMinutes(r.horaFin)))
     );
 
     if (cruceLocal) {

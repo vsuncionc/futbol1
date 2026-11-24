@@ -22,6 +22,7 @@ public class FileStorageService {
     private final Path comprobantesLocation = rootLocation.resolve("comprobantes");
     private final Path jugadoresLocation = rootLocation.resolve("jugadores");
     private final Path bannersLocation = rootLocation.resolve("banners");
+    private final Path avatarsLocation = rootLocation.resolve("avatars");
 
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
     private static final Set<String> ALLOWED_COMPROBANTE_TYPES = Set.of("image/jpeg", "image/png", "application/pdf");
@@ -31,6 +32,7 @@ public class FileStorageService {
             Files.createDirectories(comprobantesLocation);
             Files.createDirectories(jugadoresLocation);
             Files.createDirectories(bannersLocation);
+            Files.createDirectories(avatarsLocation);
         } catch (IOException e) {
             log.error("No se pudo inicializar el almacenamiento de archivos", e);
         }
@@ -49,6 +51,11 @@ public class FileStorageService {
     public String storeBanner(MultipartFile file) {
         validateFile(file, ALLOWED_IMAGE_TYPES, 5 * 1024 * 1024L, "Banner");
         return store(file, bannersLocation, "banners");
+    }
+
+    public String storeAvatar(MultipartFile file) {
+        validateFile(file, ALLOWED_IMAGE_TYPES, 5 * 1024 * 1024L, "Foto de perfil");
+        return store(file, avatarsLocation, "avatars");
     }
 
     private void validateFile(MultipartFile file, Set<String> allowedTypes, long maxBytes, String label) {

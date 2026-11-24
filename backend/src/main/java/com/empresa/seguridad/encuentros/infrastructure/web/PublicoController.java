@@ -85,8 +85,8 @@ public class PublicoController {
             @PathVariable String folder,
             @PathVariable String filename
     ) {
-        // Solo fotos de jugadores y banners son públicos
-        if (!"jugadores".equals(folder) && !"banners".equals(folder)) {
+        // Solo fotos de jugadores, banners y avatars son públicos
+        if (!"jugadores".equals(folder) && !"banners".equals(folder) && !"avatars".equals(folder)) {
             return ResponseEntity.status(403).build();
         }
 

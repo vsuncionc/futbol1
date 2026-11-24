@@ -4,6 +4,7 @@ export interface UserSummary {
   fullName: string;
   telefono?: string;
   estadoAprobacion?: 'PENDIENTE' | 'ACTIVO' | 'RECHAZADO' | 'SUSPENDIDO';
+  avatarUrl?: string | null;
   roles: string[];
   permissions: string[];
 }

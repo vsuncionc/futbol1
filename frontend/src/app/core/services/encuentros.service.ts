@@ -90,6 +90,10 @@ export class EncuentrosService {
     return this.http.get<Cancha[]>(`${this.BASE_URL}/canchas`);
   }
 
+  actualizarTarifaCancha(canchaId: number, tarifaHora: number): Observable<Cancha> {
+    return this.http.put<Cancha>(`${this.BASE_URL}/canchas/${canchaId}/tarifa`, { tarifaHora });
+  }
+
   registroTecnico(datos: any): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.BASE_URL}/publico/registro-tecnico`, datos);
   }

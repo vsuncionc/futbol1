@@ -11,7 +11,14 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import Swal from 'sweetalert2';
 import { AuthService } from '../../core/services/auth.service';
+import { EncuentrosService } from '../../core/services/encuentros.service';
 import { SystemConfig } from '../../core/models/auth.models';
+import { Cancha } from '../../core/models/encuentros.models';
+
+interface CanchaEditable extends Cancha {
+  nuevaTarifa: number;
+  guardando: boolean;
+}
 
 @Component({
   selector: 'app-config',
@@ -34,7 +41,7 @@ import { SystemConfig } from '../../core/models/auth.models';
         <mat-icon>settings</mat-icon>
         <span>Configuración del Sistema</span>
       </h1>
-      <p>Políticas de seguridad, gestión de sesiones y parámetros globales de FUTBOL S.A.</p>
+      <p>Políticas de seguridad, tarifas de canchas y parámetros globales de FUTBOL S.A.</p>
     </div>
 
     @if (alertMessage()) {
@@ -44,9 +51,130 @@ import { SystemConfig } from '../../core/models/auth.models';
       </div>
     }
 
-    <div style="display: flex; flex-direction: column; gap: 1.75rem; max-width: 900px;">
+    <div style="display: flex; flex-direction: column; gap: 1.75rem; max-width: 960px;">
       
-      <!-- CARD 1: POLÍTICAS DE REGISTRO Y ACCESO PÚBLICO -->
+      <!-- SECCIÓN: PRECIO DE LA CANCHA (GESTIÓN DE TARIFAS DEPORTIVAS) -->
+      <div class="white-panel-card" style="border-left: 4px solid #10b981;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+              <mat-icon style="font-size: 24px; width: 24px; height: 24px;">sports_soccer</mat-icon>
+            </div>
+            <div>
+              <h3 style="font-size: 1.22rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <span>Precio de la Cancha</span>
+                <span style="font-size: 0.74rem; background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; padding: 2px 8px; border-radius: 12px; font-weight: 700;">
+                  Tarifas por Hora
+                </span>
+              </h3>
+              <p style="font-size: 0.86rem; color: #64748b; margin: 0.2rem 0 0 0;">
+                Establece y actualiza las tarifas de alquiler por hora para cada cancha deportiva de FUTBOL S.A.
+              </p>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            @if (cargandoCanchas()) {
+              <div style="display: flex; align-items: center; gap: 0.4rem; color: #64748b; font-size: 0.82rem;">
+                <mat-spinner diameter="16"></mat-spinner>
+                <span>Cargando...</span>
+              </div>
+            }
+            <button 
+              type="button" 
+              mat-stroked-button 
+              (click)="loadCanchas()" 
+              [disabled]="cargandoCanchas()"
+              style="height: 36px; border-radius: 8px; font-size: 0.84rem; color: #334155;">
+              <mat-icon style="font-size: 18px; width: 18px; height: 18px; margin-right: 4px;">refresh</mat-icon>
+              <span>Refrescar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- LISTADO DE CANCHAS -->
+        <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+          @if (canchasEditables().length === 0 && !cargandoCanchas()) {
+            <div style="text-align: center; padding: 2rem; color: #64748b;">
+              <mat-icon style="font-size: 36px; width: 36px; height: 36px; opacity: 0.4;">sports_soccer</mat-icon>
+              <p style="margin: 0.5rem 0 0 0;">No se encontraron canchas registradas.</p>
+            </div>
+          }
+
+          @for (c of canchasEditables(); track c.id) {
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-radius: 10px; background: #f8fafc; border: 1px solid #e2e8f0; flex-wrap: wrap; gap: 1rem; transition: all 0.2s ease;">
+              <div style="display: flex; align-items: center; gap: 1rem;">
+                <div [ngStyle]="{
+                  'background': c.tipo === 'F5' ? '#eff6ff' : c.tipo === 'F7' ? '#f0fdf4' : '#faf5ff',
+                  'color': c.tipo === 'F5' ? '#2563eb' : c.tipo === 'F7' ? '#16a34a' : '#9333ea',
+                  'border': '1px solid ' + (c.tipo === 'F5' ? '#bfdbfe' : c.tipo === 'F7' ? '#bbf7d0' : '#e9d5ff')
+                }" style="width: 44px; height: 44px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem;">
+                  <span>{{ c.tipo }}</span>
+                </div>
+
+                <div>
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <strong style="color: #0f172a; font-size: 1.05rem;">{{ c.nombre }}</strong>
+                    <span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 10px; font-weight: 700; background: #e2e8f0; color: #475569;">
+                      {{ c.tipo === 'F5' ? 'Fútbol 5' : c.tipo === 'F7' ? 'Fútbol 7' : 'Fútbol 11' }}
+                    </span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.25rem; font-size: 0.82rem;">
+                    <span style="color: #64748b;">Precio actual en sistema:</span>
+                    <strong style="color: #059669; font-size: 0.92rem;">S/ {{ c.tarifaHora | number:'1.2-2' }} por hora</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CONTROLES DE EDICIÓN DE PRECIO -->
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="display: flex; align-items: center; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 0.35rem 0.65rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                  <span style="font-weight: 800; color: #059669; margin-right: 0.35rem; font-size: 1rem;">S/</span>
+                  <input 
+                    type="number" 
+                    [(ngModel)]="c.nuevaTarifa" 
+                    min="1" 
+                    step="5"
+                    style="width: 95px; border: none; outline: none; font-size: 1.05rem; font-weight: 700; color: #0f172a; text-align: right;"
+                    placeholder="0.00" />
+                  <span style="font-size: 0.75rem; color: #64748b; margin-left: 0.35rem; font-weight: 600;">/hora</span>
+                </div>
+
+                <button 
+                  type="button" 
+                  mat-flat-button 
+                  (click)="guardarTarifaCancha(c)"
+                  [disabled]="c.guardando || c.nuevaTarifa <= 0 || c.nuevaTarifa === c.tarifaHora"
+                  [ngStyle]="{
+                    'background': c.nuevaTarifa !== c.tarifaHora ? '#10b981' : '#e2e8f0',
+                    'color': c.nuevaTarifa !== c.tarifaHora ? '#ffffff' : '#94a3b8'
+                  }"
+                  style="min-width: 125px; height: 40px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                  @if (c.guardando) {
+                    <mat-spinner diameter="16" style="display: inline-block;"></mat-spinner>
+                    <span>Guardando...</span>
+                  } @else {
+                    <span style="display: inline-flex; align-items: center; gap: 4px;">
+                      <mat-icon style="font-size: 18px; width: 18px; height: 18px;">save</mat-icon>
+                      <span>{{ c.nuevaTarifa !== c.tarifaHora ? 'Fijar Precio' : 'Guardado' }}</span>
+                    </span>
+                  }
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- NOTA INFORMATIVA -->
+        <div style="margin-top: 1.25rem; padding: 0.75rem 1rem; border-radius: 8px; background: #ecfdf5; border: 1px solid #a7f3d0; display: flex; align-items: center; gap: 0.65rem;">
+          <mat-icon style="color: #059669; font-size: 20px; width: 20px; height: 20px;">check_circle</mat-icon>
+          <span style="font-size: 0.82rem; color: #065f46; line-height: 1.4;">
+            <b>Impacto inmediato:</b> Al actualizar el precio de una cancha, el nuevo costo por hora se refleja al instante en el cálculo de montos de las reservas y en el catálogo público de FUTBOL S.A.
+          </span>
+        </div>
+      </div>
+
+      <!-- CARD 2: POLÍTICAS DE REGISTRO Y ACCESO PÚBLICO -->
       <div class="white-panel-card">
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
           <div style="width: 36px; height: 36px; border-radius: 8px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center;">
@@ -90,7 +218,7 @@ import { SystemConfig } from '../../core/models/auth.models';
         </div>
       </div>
 
-      <!-- CARD 2: POLÍTICAS DE FUERZA BRUTA Y BLOQUEO DE CUENTAS -->
+      <!-- CARD 3: POLÍTICAS DE FUERZA BRUTA Y BLOQUEO DE CUENTAS -->
       <div class="white-panel-card">
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
           <div style="width: 36px; height: 36px; border-radius: 8px; background: #fee2e2; color: #dc2626; display: flex; align-items: center; justify-content: center;">
@@ -134,7 +262,7 @@ import { SystemConfig } from '../../core/models/auth.models';
         </div>
       </div>
 
-      <!-- CARD 3: CRIPTOGRAFÍA Y SESIONES -->
+      <!-- CARD 4: CRIPTOGRAFÍA Y SESIONES -->
       <div class="white-panel-card">
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
           <div style="width: 36px; height: 36px; border-radius: 8px; background: #f3e8ff; color: #7e22ce; display: flex; align-items: center; justify-content: center;">
@@ -175,7 +303,7 @@ import { SystemConfig } from '../../core/models/auth.models';
         </div>
       </div>
 
-      <!-- CARD 4: MOTOR DE BASE DE DATOS Y CONSOLA H2 -->
+      <!-- CARD 5: MOTOR DE BASE DE DATOS Y CONSOLA H2 -->
       <div class="white-panel-card">
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
           <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -205,6 +333,7 @@ import { SystemConfig } from '../../core/models/auth.models';
 export class ConfigComponent implements OnInit {
   private http = inject(HttpClient);
   public authService = inject(AuthService);
+  private encuentrosService = inject(EncuentrosService);
 
   private readonly API_URL = 'http://localhost:8080/api/v1/admin/config';
 
@@ -214,8 +343,13 @@ export class ConfigComponent implements OnInit {
   readonly isSavingPolicies = signal(false);
   readonly alertMessage = signal<string | null>(null);
 
+  // Canchas y Precios
+  readonly canchasEditables = signal<CanchaEditable[]>([]);
+  readonly cargandoCanchas = signal<boolean>(false);
+
   ngOnInit(): void {
     this.loadConfigs();
+    this.loadCanchas();
   }
 
   loadConfigs(): void {
@@ -231,6 +365,61 @@ export class ConfigComponent implements OnInit {
         if (lock) this.lockDurationMinutes.set(parseInt(lock.value, 10));
       },
       error: () => {}
+    });
+  }
+
+  loadCanchas(): void {
+    this.cargandoCanchas.set(true);
+    this.encuentrosService.getCanchas().subscribe({
+      next: (data) => {
+        const editables: CanchaEditable[] = (data || []).map(c => ({
+          ...c,
+          nuevaTarifa: c.tarifaHora,
+          guardando: false
+        }));
+        this.canchasEditables.set(editables);
+        this.cargandoCanchas.set(false);
+      },
+      error: () => {
+        this.cargandoCanchas.set(false);
+      }
+    });
+  }
+
+  guardarTarifaCancha(c: CanchaEditable): void {
+    if (!c.nuevaTarifa || c.nuevaTarifa <= 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Precio Inválido',
+        text: 'Por favor ingresa un precio por hora mayor a cero.',
+        confirmButtonColor: '#0066ff'
+      });
+      return;
+    }
+
+    c.guardando = true;
+    this.encuentrosService.actualizarTarifaCancha(c.id, c.nuevaTarifa).subscribe({
+      next: (actualizada) => {
+        c.guardando = false;
+        c.tarifaHora = actualizada.tarifaHora;
+        c.nuevaTarifa = actualizada.tarifaHora;
+        Swal.fire({
+          icon: 'success',
+          title: '¡Precio Actualizado!',
+          html: `La tarifa de <b>${c.nombre}</b> se estableció en <b style="color:#10b981;">S/ ${c.tarifaHora.toFixed(2)} / hora</b>.`,
+          confirmButtonColor: '#0066ff',
+          timer: 2500
+        });
+      },
+      error: (err) => {
+        c.guardando = false;
+        Swal.fire({
+          icon: 'error',
+          title: 'Error al fijar precio',
+          text: err.error?.detail || err.error?.message || 'No se pudo actualizar el precio de la cancha.',
+          confirmButtonColor: '#ef4444'
+        });
+      }
     });
   }
 
@@ -280,7 +469,7 @@ export class ConfigComponent implements OnInit {
         });
       },
       error: () => this.isSavingPolicies.set(false)
-    });
+        });
   }
 
   private showAlert(msg: string): void {
