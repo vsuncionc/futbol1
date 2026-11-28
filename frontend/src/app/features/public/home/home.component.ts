@@ -837,13 +837,27 @@ export interface HeroSlide {
       font-weight: 700 !important;
       border-radius: 20px !important;
       padding: 0 1.25rem !important;
+      white-space: nowrap !important;
+      height: 40px !important;
     }
 
     .btn-login-top {
-      color: #e2e8f0 !important;
-      border-color: rgba(255, 255, 255, 0.2) !important;
+      background-color: rgba(255, 255, 255, 0.08) !important;
+      color: #ffffff !important;
+      border: 1px solid rgba(255, 255, 255, 0.35) !important;
       border-radius: 20px !important;
       font-weight: 600 !important;
+      padding: 0 1.15rem !important;
+      height: 40px !important;
+      white-space: nowrap !important;
+      transition: all 0.2s ease !important;
+    }
+
+    .btn-login-top:hover {
+      background-color: rgba(255, 255, 255, 0.18) !important;
+      border-color: #ffffff !important;
+      color: #ffffff !important;
+      transform: translateY(-1px) !important;
     }
 
     .btn-register-top {
@@ -851,6 +865,9 @@ export interface HeroSlide {
       color: #ffffff !important;
       font-weight: 700 !important;
       border-radius: 20px !important;
+      padding: 0 1.15rem !important;
+      height: 40px !important;
+      white-space: nowrap !important;
       box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
     }
 
